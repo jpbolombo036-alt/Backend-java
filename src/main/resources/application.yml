@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/itaccess}
+    url: jdbc:postgresql://dpg-d84e85vavr4c73d1ijog-a:5432/itaccess_db
     driver-class-name: org.postgresql.Driver
-    username: ${DATABASE_USERNAME:postgres}
-    password: ${DATABASE_PASSWORD:postgres}
+    username: itaccess_db_user
+    password: 6ZlRg31AoLqBWymaE3zBMcQ7H79Zdb2X
 
   jpa:
     hibernate:
