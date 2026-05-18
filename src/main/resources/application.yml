@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://dpg-d84e85vavr4c73d1ijog-a:5432/itaccess_db
+    url: postgresql://itaccess_db_z7ip_user:C1Bn64Nx2YM46CqKu8d7OYOqUpksqDxs@dpg-d85fenjbc2fs73bp8d0g-a/itaccess_db_z7ip
     driver-class-name: org.postgresql.Driver
-    username: itaccess_db_user
-    password: 6ZlRg31AoLqBWymaE3zBMcQ7H79Zdb2X
+    username: itaccess_db_z7ip_user
+    password: C1Bn64Nx2YM46CqKu8d7OYOqUpksqDxs
 
   jpa:
     hibernate:
