@@ -56,7 +56,11 @@ public class TestService {
         
         Long appId = (request.getApplicationId() != null && request.getApplicationId() != 0) ? request.getApplicationId() : null;
         
+        // Récupérer le prochain ID de test pour cette session (commence à 1 pour chaque session)
+        Long nextTestId = getNextTestIdForSession(request.getSessionId());
+        
         Test test = Test.builder()
+                .id(nextTestId) // Forcer l'ID pour cette session
                 .sessionId(request.getSessionId())
                 .applicationId(appId)
                 .applicationNom(request.getApplicationNom())
@@ -104,6 +108,27 @@ public class TestService {
             throw new ResourceNotFoundException("Test non trouvé avec l'ID: " + id);
         }
         testRepository.deleteById(id);
+    }
+    
+    /**
+     * Récupère le prochain ID de test pour une session donnée
+     * Les tests commencent à 1 pour chaque nouvelle session
+     */
+    private Long getNextTestIdForSession(Long sessionId) {
+        // Récupérer tous les tests existants pour cette session
+        List<Test> existingTests = testRepository.findBySessionId(sessionId);
+        
+        if (existingTests.isEmpty()) {
+            return 1L; // Premier test de la session
+        }
+        
+        // Trouver l'ID maximum et ajouter 1
+        Long maxId = existingTests.stream()
+                .mapToLong(Test::getId)
+                .max()
+                .orElse(0L);
+        
+        return maxId + 1;
     }
     
     private TestDTO toDTO(Test test) {

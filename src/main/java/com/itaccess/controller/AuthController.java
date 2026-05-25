@@ -1,37 +1,42 @@
 package com.itaccess.controller;
 
-import com.itaccess.dto.*;
-import com.itaccess.entity.User;
-import com.itaccess.repository.UserRepository;
-import com.itaccess.security.JwtTokenProvider;
-import com.itaccess.service.EmailService;
-import com.itaccess.service.SettingService;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.web.bind.annotation.*;
+ import com.itaccess.dto.*;
+ import com.itaccess.entity.User;
+ import com.itaccess.repository.UserRepository;
+ import com.itaccess.security.JwtTokenProvider;
+ import com.itaccess.service.EmailService;
+ import com.itaccess.service.SettingService;
+ import io.swagger.v3.oas.annotations.Operation;
+ import io.swagger.v3.oas.annotations.tags.Tag;
+ import jakarta.validation.Valid;
+ import lombok.RequiredArgsConstructor;
+ import lombok.extern.slf4j.Slf4j;
+ import org.springframework.beans.factory.annotation.Value;
+ import org.springframework.http.HttpStatus;
+ import org.springframework.http.ResponseEntity;
+ import org.springframework.security.authentication.AuthenticationManager;
+ import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+ import org.springframework.security.core.Authentication;
+ import org.springframework.security.core.AuthenticationException;
+ import org.springframework.security.core.context.SecurityContextHolder;
+ import org.springframework.security.crypto.password.PasswordEncoder;
+ import org.springframework.web.bind.annotation.*;
 
-@RestController
-@RequestMapping("/auth")
-@RequiredArgsConstructor
-@Tag(name = "Authentication", description = "")
-public class AuthController {
-    
-    private final AuthenticationManager authenticationManager;
-    private final JwtTokenProvider jwtTokenProvider;
-    private final UserRepository userRepository;
-    private final SettingService settingService;
-    private final EmailService emailService;
-    private final PasswordEncoder passwordEncoder;
+ @RestController
+ @RequestMapping("/auth")
+ @RequiredArgsConstructor
+ @Tag(name = "Authentication", description = "")
+ @Slf4j
+ public class AuthController {
+     
+     private final AuthenticationManager authenticationManager;
+     private final JwtTokenProvider jwtTokenProvider;
+     private final UserRepository userRepository;
+     private final SettingService settingService;
+     private final EmailService emailService;
+     private final PasswordEncoder passwordEncoder;
+     @Value("${app.security.admin-init-key}")
+     private String adminInitKey;
     
     @PostMapping(value = "/token", consumes = {"application/json", "application/x-www-form-urlencoded"})
     @Operation(summary = "Connexion", description = "Authentifie l'utilisateur et retourne un token JWT")
@@ -89,19 +94,21 @@ public class AuthController {
                     .tokenType("bearer")
                     .build());
             
-        } catch (AuthenticationException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(TokenResponse.builder()
-                            .accessToken("Nom d'utilisateur ou mot de passe incorrect")
-                            .tokenType("bearer")
-                            .build());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(TokenResponse.builder()
-                            .accessToken("Erreur: " + e.getMessage())
-                            .tokenType("bearer")
-                            .build());
-        }
+         } catch (AuthenticationException e) {
+             log.warn("Échec d'authentification pour l'utilisateur: {}", user, e);
+             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                     .body(TokenResponse.builder()
+                             .accessToken("Nom d'utilisateur ou mot de passe incorrect")
+                             .tokenType("bearer")
+                             .build());
+         } catch (Exception e) {
+             log.error("Erreur lors de l'authentification pour l'utilisateur: {}", user, e);
+             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                     .body(TokenResponse.builder()
+                             .accessToken("Erreur: " + e.getMessage())
+                             .tokenType("bearer")
+                             .build());
+         }
     }
     
     @GetMapping("/me")
@@ -158,16 +165,14 @@ public class AuthController {
         }
     }
     
-    @PostMapping("/init-admin")
-    @Operation(summary = "Initialiser l'admin", description = "Crée l'utilisateur admin initial (à utiliser uniquement pour la première configuration)")
-    public ResponseEntity<String> initAdmin(@RequestParam(required = false) String initKey) {
-        // Clé de sécurité pour éviter les créations non autorisées
-        String secureInitKey = "IT_ACCESS_INIT_2024_SECURE_KEY_CHANGE_ME";
-        
-        if (initKey == null || !initKey.equals(secureInitKey)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body("Clé d'initialisation invalide");
-        }
+     @PostMapping("/init-admin")
+     @Operation(summary = "Initialiser l'admin", description = "Crée l'utilisateur admin initial (à utiliser uniquement pour la première configuration)")
+     public ResponseEntity<String> initAdmin(@RequestParam(required = false) String initKey) {
+         // Clé de sécurité pour éviter les créations non autorisées
+         if (initKey == null || !initKey.equals(adminInitKey)) {
+             return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                     .body("Clé d'initialisation invalide");
+         }
         
         // Vérifier si un admin existe déjà
         boolean adminExists = userRepository.findAll().stream()

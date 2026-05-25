@@ -92,12 +92,12 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUserProfile(currentUser.getId(), dto));
     }
     
-    @PutMapping("/me/password")
-    @Operation(summary = "Changer le mot de passe", description = "Change le mot de passe de l'utilisateur connecté")
-    public ResponseEntity<Void> changePassword(
-            @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
-            @RequestBody PasswordChangeRequest request) {
-        userService.changePassword(currentUser.getId(), request.getOldPassword(), request.getNewPassword());
-        return ResponseEntity.ok().build();
-    }
+     @PutMapping("/me/password")
+     @Operation(summary = "Changer le mot de passe", description = "Change le mot de passe de l'utilisateur connecté")
+     public ResponseEntity<Void> changePassword(
+             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
+             @Valid @RequestBody PasswordChangeRequest request) {
+         userService.changePassword(currentUser.getId(), request.getOldPassword(), request.getNewPassword());
+         return ResponseEntity.ok().build();
+     }
 }
