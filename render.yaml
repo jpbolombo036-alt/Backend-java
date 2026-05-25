@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: itaccess-backend
+    env: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: itaccess-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_DRIVER_CLASS
+        value: org.postgresql.Driver
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: itaccess-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: itaccess-db
+          property: password
+      - key: HIBERNATE_DIALECT
+        value: org.hibernate.dialect.PostgreSQLDialect
+      - key: JWT_SECRET
+        generateValue: true
+      - key: SERVER_PORT
+        value: 8000
+
+databases:
+  - name: itaccess-db
+    databaseName: itaccess
+    user: itaccess_user
+    plan: free

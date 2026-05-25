@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://dpg-d85fenjbc2fs73bp8d0g-a.oregon-postgres.render.com:5432/itaccess_db_z7ip}
+    url: jdbc:postgresql://dpg-d7egn1n7f7vs739bvh10-a:5432/itaccess
     driver-class-name: org.postgresql.Driver
-    username: ${SPRING_DATASOURCE_USERNAME:itaccess_db_z7ip_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:C1Bn64Nx2YM46CqKu8d7OYOqUpksqDxs}
+    username: itaccess_user
+    password: Vij9E2rXltNYcSMn6S2kKuqgOqWqRlXA
 
   jpa:
     hibernate:
@@ -52,7 +52,6 @@ app:
     require-activation: true
     max-login-attempts: 5
     lockout-duration-minutes: 15
-    admin-init-key: ${ADMIN_INIT_KEY:IT_ACCESS_INIT_2024_SECURE_KEY_CHANGE_ME}
   
   frontend:
     url: ${FRONTEND_URL:https://it-testerkansa.vercel.app}
