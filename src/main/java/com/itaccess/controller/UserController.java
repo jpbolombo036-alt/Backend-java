@@ -5,6 +5,7 @@ import com.itaccess.dto.PasswordChangeRequest;
 import com.itaccess.dto.UserDTO;
 import com.itaccess.security.CurrentUser;
 import com.itaccess.security.UserInfo;
+import com.itaccess.security.UserInfo;
 import com.itaccess.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;

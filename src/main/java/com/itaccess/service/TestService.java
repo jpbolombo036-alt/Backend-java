@@ -9,6 +9,7 @@ import com.itaccess.repository.TestRepository;
 import com.itaccess.repository.TestSessionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
@@ -17,51 +18,56 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class TestService {
-    
+
     private final TestRepository testRepository;
     private final TestSessionRepository testSessionRepository;
     private final ApplicationRepository applicationRepository;
-    
+
     public List<TestDTO> getAllTests() {
         return testRepository.findAll().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
-    
+
     public List<TestDTO> getTestsBySessionId(Long sessionId) {
         return testRepository.findBySessionId(sessionId).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
-    
+
     public TestDTO getTestById(Long id) {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Test non trouvé avec l'ID: " + id));
         return toDTO(test);
     }
-    
-    @Transactional
+
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public TestDTO createTest(TestRequest request, Long createdBy) {
+        // Validation de l'application
         if (request.getApplicationId() != null && request.getApplicationId() != 0) {
             if (!applicationRepository.existsById(request.getApplicationId())) {
                 throw new ResourceNotFoundException("Application non trouvée avec l'ID: " + request.getApplicationId());
             }
         }
-        
+
+        // Validation de la session (maintenant cohérente avec l'application)
         if (request.getSessionId() != null) {
+            if (request.getSessionId() == 0) {
+                throw new ResourceNotFoundException("ID de session invalide: 0");
+            }
             if (!testSessionRepository.existsById(request.getSessionId())) {
                 throw new ResourceNotFoundException("Session non trouvée avec l'ID: " + request.getSessionId());
             }
         }
-        
+
         Long appId = (request.getApplicationId() != null && request.getApplicationId() != 0) ? request.getApplicationId() : null;
-        
-        // Récupérer le prochain ID de test pour cette session (commence à 1 pour chaque session)
-        Long nextTestId = getNextTestIdForSession(request.getSessionId());
-        
+
+        // Récupérer le prochain numéro de test pour cette session (commence à 1 pour chaque session)
+        Long nextTestNumber = getNextTestNumberForSession(request.getSessionId());
+
         Test test = Test.builder()
-                .id(nextTestId) // Forcer l'ID pour cette session
                 .sessionId(request.getSessionId())
+                .testNumber(nextTestNumber) // Utilisation du nouveau champ métier
                 .applicationId(appId)
                 .applicationNom(request.getApplicationNom())
                 .version(request.getVersion())
@@ -75,16 +81,16 @@ public class TestService {
                 .commentaires(request.getCommentaires())
                 .createdBy(createdBy)
                 .build();
-        
+
         Test savedTest = testRepository.save(test);
         return toDTO(savedTest);
     }
-    
+
     @Transactional
     public TestDTO updateTest(Long id, TestRequest request) {
         Test test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Test non trouvé avec l'ID: " + id));
-        
+
         test.setSessionId(request.getSessionId());
         test.setApplicationId(request.getApplicationId());
         test.setApplicationNom(request.getApplicationNom());
@@ -97,11 +103,11 @@ public class TestService {
         test.setResultatObtenu(request.getResultatObtenu());
         test.setStatut(request.getStatut());
         test.setCommentaires(request.getCommentaires());
-        
+
         Test updatedTest = testRepository.save(test);
         return toDTO(updatedTest);
     }
-    
+
     @Transactional
     public void deleteTest(Long id) {
         if (!testRepository.existsById(id)) {
@@ -109,28 +115,33 @@ public class TestService {
         }
         testRepository.deleteById(id);
     }
-    
+
     /**
-     * Récupère le prochain ID de test pour une session donnée
+     * Récupère le prochain numéro de test pour une session donnée
      * Les tests commencent à 1 pour chaque nouvelle session
      */
-    private Long getNextTestIdForSession(Long sessionId) {
+    private Long getNextTestNumberForSession(Long sessionId) {
+        // Si sessionId est null, on retourne 1 (pas de session spécifique)
+        if (sessionId == null) {
+            return 1L;
+        }
+
         // Récupérer tous les tests existants pour cette session
         List<Test> existingTests = testRepository.findBySessionId(sessionId);
-        
+
         if (existingTests.isEmpty()) {
             return 1L; // Premier test de la session
         }
-        
-        // Trouver l'ID maximum et ajouter 1
-        Long maxId = existingTests.stream()
-                .mapToLong(Test::getId)
+
+        // Trouver le numéro maximum et ajouter 1
+        Long maxNumber = existingTests.stream()
+                .mapToLong(Test::getTestNumber)
                 .max()
                 .orElse(0L);
-        
-        return maxId + 1;
+
+        return maxNumber + 1;
     }
-    
+
     private TestDTO toDTO(Test test) {
         return TestDTO.builder()
                 .id(test.getId())

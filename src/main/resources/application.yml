@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: jdbc:postgresql://itaccess_db_z7ip_user:C1Bn64Nx2YM46CqKu8d7OYOqUpksqDxs@dpg-d85fenjbc2fs73bp8d0g-a.oregon-postgres.render.com/itaccess_db_z7ip
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://dpg-d85fenjbc2fs73bp8d0g-a.oregon-postgres.render.com:5432/itaccess_db_z7ip}
     driver-class-name: org.postgresql.Driver
-    username: itaccess_db_z7ip_user
-    password: C1Bn64Nx2YM46CqKu8d7OYOqUpksqDxs
+    username: ${SPRING_DATASOURCE_USERNAME:itaccess_db_z7ip_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:C1Bn64Nx2YM46CqKu8d7OYOqUpksqDxs}
 
   jpa:
     hibernate:
@@ -41,7 +41,7 @@ server:
 
 app:
   cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://it-testerkansa.vercel.app,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://it-testerkansa.vercel.app,http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080,http://localhost:4200,http://127.0.0.1:4200,http://localhost:8000,http://127.0.0.1:8000}
   
   jwt:
     secret: ${JWT_SECRET:please-change-this-in-production-use-a-secure-random-key-at-least-256-bits}
