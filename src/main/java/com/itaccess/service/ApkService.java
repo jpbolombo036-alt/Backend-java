@@ -139,9 +139,13 @@ public class ApkService {
         apkFile.setDownloadCount(apkFile.getDownloadCount() + 1); // Ajoute 1 au compteur actuel
         apkFileRepository.save(apkFile); // Sauvegarde la mise à jour en base
         
-        // LECTURE : Lecture du fichier physique depuis le disque
-        Path filePath = Paths.get(apkFile.getFilePath()); // Convertit le chemin string en objet Path
-        return Files.readAllBytes(filePath); // Lit tout le fichier et retourne les octets
+        // Note: Pour des fichiers volumineux, préférez retourner un Resource ou un InputStream
+        // au lieu de charger tous les octets en mémoire vive.
+        Path filePath = Paths.get(apkFile.getFilePath());
+        if (!Files.exists(filePath)) {
+            throw new ResourceNotFoundException("Fichier physique non trouvé");
+        }
+        return Files.readAllBytes(filePath);
     }
     
     /**

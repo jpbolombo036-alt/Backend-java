@@ -5,7 +5,6 @@ import static org.mockito.Mockito.*;
 
 import com.itaccess.dto.TestDTO;
 import com.itaccess.dto.TestRequest;
-import com.itaccess.entity.Test;
 import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.ApplicationRepository;
 import com.itaccess.repository.TestRepository;
@@ -16,6 +15,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -35,13 +35,13 @@ class TestServiceTest {
     @InjectMocks
     private TestService testService;
 
-    private Test test;
+    private com.itaccess.entity.Test test;
     private TestDTO testDTO;
     private TestRequest testRequest;
 
     @BeforeEach
     void setUp() {
-        test = new Test();
+        test = new com.itaccess.entity.Test();
         test.setId(1L);
         test.setSessionId(10L);
         test.setApplicationId(5L);
@@ -137,22 +137,24 @@ class TestServiceTest {
 
     @Test
     void createTest_createsAndReturnsTestDTO() {
+        // Préparer les mocks pour la logique de création
         when(applicationRepository.existsById(5L)).thenReturn(true);
         when(testSessionRepository.existsById(10L)).thenReturn(true);
-        when(testRepository.save(any(Test.class))).thenReturn(test);
+        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList()); // Liste vide -> premier test = 1
+        when(testRepository.save(any(com.itaccess.entity.Test.class))).thenReturn(test);
 
         TestDTO result = testService.createTest(testRequest, 1L);
 
         assertNotNull(result);
-        assertEquals(testDTO.getId(), result.getId());
-        assertEquals(testDTO.getTestNumber(), result.getTestNumber());
-        verify(testRepository, times(1)).save(any(Test.class));
         
-        // Vérifier que l'ID n'est pas forcé (doit être généré par la DB)
-        // Puisque nous mockons save(), on ne peut pas vérifier directement,
-        // mais on peut vérifier que testNumber est bien défini
-        Test savedTest = captureSavedTest();
-        assertEquals(2L, savedTest.getTestNumber());
+        // Capturer l'objet envoyé au repository pour vérifier le testNumber calculé
+        ArgumentCaptor<com.itaccess.entity.Test> testCaptor = ArgumentCaptor.forClass(com.itaccess.entity.Test.class);
+        verify(testRepository).save(testCaptor.capture());
+        
+        com.itaccess.entity.Test savedTest = testCaptor.getValue();
+        assertEquals(1L, savedTest.getTestNumber()); // Doit être 1 car findBySessionId a retourné une liste vide
+        assertEquals("TestApp", savedTest.getApplicationNom());
+        verify(testRepository, times(1)).save(any(com.itaccess.entity.Test.class));
     }
 
     @Test
@@ -183,7 +185,7 @@ class TestServiceTest {
     @Test
     void updateTest_updatesAndReturnsTestDTO() {
         when(testRepository.findById(1L)).thenReturn(Optional.of(test));
-        when(testRepository.save(any(Test.class))).thenReturn(test);
+        when(testRepository.save(any(com.itaccess.entity.Test.class))).thenReturn(test);
 
         TestDTO result = testService.updateTest(1L, testRequest);
 
@@ -191,7 +193,7 @@ class TestServiceTest {
         assertEquals(testDTO.getId(), result.getId());
         assertEquals(testDTO.getTestNumber(), result.getTestNumber());
         verify(testRepository, times(1)).findById(1L);
-        verify(testRepository, times(1)).save(any(Test.class));
+        verify(testRepository, times(1)).save(any(com.itaccess.entity.Test.class));
     }
 
     @Test
@@ -231,10 +233,10 @@ class TestServiceTest {
 
     @Test
     void getNextTestNumberForSession_returnsNextNumber_whenExistingTests() {
-        Test test1 = new Test();
+        com.itaccess.entity.Test test1 = new com.itaccess.entity.Test();
         test1.setTestNumber(1L);
         test1.setSessionId(10L);
-        Test test2 = new Test();
+        com.itaccess.entity.Test test2 = new com.itaccess.entity.Test();
         test2.setTestNumber(3L);
         test2.setSessionId(10L);
         when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList(test1, test2));
@@ -251,10 +253,4 @@ class TestServiceTest {
         assertEquals(1L, result);
     }
 
-    // Méthode helper pour capturer l'entité Test passée à save()
-    private Test captureSavedTest() {
-        // Cette méthode serait normalement implémentée avec un ArgumentCaptor
-        // Pour simplifier, on retourne un mock basique
-        return test;
-    }
 }

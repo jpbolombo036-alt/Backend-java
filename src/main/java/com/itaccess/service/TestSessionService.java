@@ -147,6 +147,7 @@ public class TestSessionService {
                 .statut(test.getStatut())
                 .commentaires(test.getCommentaires())
                 .createdBy(test.getCreatedBy())
+                .testNumber(test.getTestNumber())
                 .build();
     }
 }

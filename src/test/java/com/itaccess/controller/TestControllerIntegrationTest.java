@@ -3,7 +3,6 @@ package com.itaccess.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.itaccess.dto.TestDTO;
 import com.itaccess.dto.TestRequest;
-import com.itaccess.entity.Test;
 import com.itaccess.repository.TestRepository;
 import com.itaccess.repository.TestSessionRepository;
 import com.itaccess.repository.ApplicationRepository;
@@ -45,13 +44,13 @@ class TestControllerIntegrationTest {
     @MockBean
     private ApplicationRepository applicationRepository;
 
-    private Test test;
+    private com.itaccess.entity.Test test;
     private TestDTO testDTO;
     private TestRequest testRequest;
 
     @BeforeEach
     void setUp() {
-        test = Test.builder()
+        test = com.itaccess.entity.Test.builder()
                 .id(1L)
                 .sessionId(10L)
                 .applicationId(5L)
@@ -157,8 +156,8 @@ class TestControllerIntegrationTest {
         when(applicationRepository.existsById(5L)).thenReturn(true);
         when(testSessionRepository.existsById(10L)).thenReturn(true);
         // Mock du save pour retourner l'entité avec un ID généré
-        when(testRepository.save(any(Test.class))).thenAnswer(invocation -> {
-            Test saved = invocation.getArgument(0);
+        when(testRepository.save(any(com.itaccess.entity.Test.class))).thenAnswer(invocation -> {
+            com.itaccess.entity.Test saved = invocation.getArgument(0);
             saved.setId(1L); // Simuler l'ID généré par la BD
             return saved;
         });
@@ -187,7 +186,7 @@ class TestControllerIntegrationTest {
     @WithMockUser(roles = "user")
     void updateTest_ShouldReturnOk_WhenValidData() throws Exception {
         when(testRepository.findById(1L)).thenReturn(Optional.of(test));
-        when(testRepository.save(any(Test.class))).thenReturn(test);
+        when(testRepository.save(any(com.itaccess.entity.Test.class))).thenReturn(test);
 
         mockMvc.perform(put("/tests/1")
                 .contentType(MediaType.APPLICATION_JSON)

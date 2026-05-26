@@ -53,7 +53,7 @@ public class TestService {
         // Validation de la session (maintenant cohérente avec l'application)
         if (request.getSessionId() != null) {
             if (request.getSessionId() == 0) {
-                throw new ResourceNotFoundException("ID de session invalide: 0");
+                throw new IllegalArgumentException("ID de session invalide: 0");
             }
             if (!testSessionRepository.existsById(request.getSessionId())) {
                 throw new ResourceNotFoundException("Session non trouvée avec l'ID: " + request.getSessionId());
@@ -120,7 +120,7 @@ public class TestService {
      * Récupère le prochain numéro de test pour une session donnée
      * Les tests commencent à 1 pour chaque nouvelle session
      */
-    private Long getNextTestNumberForSession(Long sessionId) {
+    public Long getNextTestNumberForSession(Long sessionId) {
         // Si sessionId est null, on retourne 1 (pas de session spécifique)
         if (sessionId == null) {
             return 1L;
@@ -135,7 +135,8 @@ public class TestService {
 
         // Trouver le numéro maximum et ajouter 1
         Long maxNumber = existingTests.stream()
-                .mapToLong(Test::getTestNumber)
+                .map(Test::getTestNumber)
+                .mapToLong(val -> val != null ? val : 0L)
                 .max()
                 .orElse(0L);
 
@@ -158,6 +159,7 @@ public class TestService {
                 .statut(test.getStatut())
                 .commentaires(test.getCommentaires())
                 .createdBy(test.getCreatedBy())
+                .testNumber(test.getTestNumber())
                 .build();
     }
 }
