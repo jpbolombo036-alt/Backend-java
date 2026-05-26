@@ -56,10 +56,14 @@ public class TodoService {
     }
     
     @Transactional
-    public TodoDTO update(Long id, TodoRequest request) {
+    public TodoDTO update(Long id, TodoRequest request, Long userId, String userRole) {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Todo not found"));
         
+        if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à modifier cette tâche");
+        }
+
         if (request.getTitle() != null) {
             todo.setTitle(request.getTitle());
         }
@@ -80,15 +84,25 @@ public class TodoService {
     }
     
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Long userId, String userRole) {
+        Todo todo = todoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Todo not found"));
+
+        if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à supprimer cette tâche");
+        }
         todoRepository.deleteById(id);
     }
     
     @Transactional
-    public TodoDTO toggleComplete(Long id) {
+    public TodoDTO toggleComplete(Long id, Long userId, String userRole) {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Todo not found"));
         
+        if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à modifier cette tâche");
+        }
+
         todo.setCompleted(!todo.getCompleted());
         return toDTO(todoRepository.save(todo));
     }

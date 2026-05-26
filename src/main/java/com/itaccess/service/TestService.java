@@ -2,7 +2,7 @@ package com.itaccess.service;
 
 import com.itaccess.dto.TestDTO;
 import com.itaccess.dto.TestRequest;
-import com.itaccess.entity.Test;
+import com.itaccess.entity.TestStep;
 import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.ApplicationRepository;
 import com.itaccess.repository.TestRepository;
@@ -36,7 +36,7 @@ public class TestService {
     }
 
     public TestDTO getTestById(Long id) {
-        Test test = testRepository.findById(id)
+        TestStep test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Test non trouvé avec l'ID: " + id));
         return toDTO(test);
     }
@@ -65,7 +65,7 @@ public class TestService {
         // Récupérer le prochain numéro de test pour cette session (commence à 1 pour chaque session)
         Long nextTestNumber = getNextTestNumberForSession(request.getSessionId());
 
-        Test test = Test.builder()
+        TestStep test = TestStep.builder()
                 .sessionId(request.getSessionId())
                 .testNumber(nextTestNumber) // Utilisation du nouveau champ métier
                 .applicationId(appId)
@@ -82,14 +82,18 @@ public class TestService {
                 .createdBy(createdBy)
                 .build();
 
-        Test savedTest = testRepository.save(test);
+        TestStep savedTest = testRepository.save(test);
         return toDTO(savedTest);
     }
 
     @Transactional
-    public TestDTO updateTest(Long id, TestRequest request) {
-        Test test = testRepository.findById(id)
+    public TestDTO updateTest(Long id, TestRequest request, Long userId, String userRole) {
+        TestStep test = testRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Test non trouvé avec l'ID: " + id));
+
+        if (!"admin".equals(userRole) && !test.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à modifier ce test");
+        }
 
         test.setSessionId(request.getSessionId());
         test.setApplicationId(request.getApplicationId());
@@ -104,16 +108,20 @@ public class TestService {
         test.setStatut(request.getStatut());
         test.setCommentaires(request.getCommentaires());
 
-        Test updatedTest = testRepository.save(test);
+        TestStep updatedTest = testRepository.save(test);
         return toDTO(updatedTest);
     }
 
     @Transactional
-    public void deleteTest(Long id) {
-        if (!testRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Test non trouvé avec l'ID: " + id);
+    public void deleteTest(Long id, Long userId, String userRole) {
+        TestStep test = testRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Test non trouvé avec l'ID: " + id));
+
+        if (!"admin".equals(userRole) && !test.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à supprimer ce test");
         }
-        testRepository.deleteById(id);
+        
+        testRepository.delete(test);
     }
 
     /**
@@ -126,24 +134,14 @@ public class TestService {
             return 1L;
         }
 
-        // Récupérer tous les tests existants pour cette session
-        List<Test> existingTests = testRepository.findBySessionId(sessionId);
-
-        if (existingTests.isEmpty()) {
-            return 1L; // Premier test de la session
-        }
-
-        // Trouver le numéro maximum et ajouter 1
-        Long maxNumber = existingTests.stream()
-                .map(Test::getTestNumber)
-                .mapToLong(val -> val != null ? val : 0L)
-                .max()
-                .orElse(0L);
-
-        return maxNumber + 1;
+        // Utilisation d'une approche plus fiable par requête directe au repository
+        // Cela évite de charger tous les tests en mémoire
+        return testRepository.findMaxTestNumberBySessionId(sessionId)
+                .map(max -> max + 1)
+                .orElse(1L);
     }
 
-    private TestDTO toDTO(Test test) {
+    private TestDTO toDTO(TestStep test) {
         return TestDTO.builder()
                 .id(test.getId())
                 .sessionId(test.getSessionId())

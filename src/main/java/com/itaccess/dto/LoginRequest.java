@@ -8,10 +8,9 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class LoginRequest {
-    
-    @NotBlank(message = "Le nom d'utilisateur est requis")
+    @NotBlank(message = "Nom d'utilisateur requis")
     private String username;
-    
-    @NotBlank(message = "Le mot de passe est requis")
+    @NotBlank(message = "Mot de passe requis")
     private String password;
+    private String phoneVersion; // Exemple: "Android 14" ou "iOS 17.4"
 }

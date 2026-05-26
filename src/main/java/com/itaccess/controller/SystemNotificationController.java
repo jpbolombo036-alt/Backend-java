@@ -9,6 +9,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -23,6 +24,10 @@ public class SystemNotificationController {
     
     @GetMapping
     @Operation(summary = "Liste des notifications", description = "Retourne toutes les notifications pour l'utilisateur connecté")
+    /**
+     * Récupère l'historique des notifications (personnelles et globales).
+     * Utilisé pour peupler le centre de notifications sur le dashboard.
+     */
     public ResponseEntity<List<SystemNotificationDTO>> getUserNotifications(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         List<SystemNotificationDTO> notifications = notificationService.getUserNotifications(currentUser.getId());
@@ -31,6 +36,10 @@ public class SystemNotificationController {
     
     @GetMapping("/unread")
     @Operation(summary = "Notifications non lues", description = "Retourne les notifications non lues pour l'utilisateur connecté")
+    /**
+     * Filtre uniquement les messages que l'utilisateur n'a pas encore consultés.
+     * Idéal pour afficher des badges de notification (pastilles rouges).
+     */
     public ResponseEntity<List<SystemNotificationDTO>> getUnreadNotifications(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         List<SystemNotificationDTO> notifications = notificationService.getUnreadNotifications(currentUser.getId());
@@ -39,6 +48,9 @@ public class SystemNotificationController {
     
     @GetMapping("/unread-count")
     @Operation(summary = "Nombre de notifications non lues", description = "Retourne le nombre de notifications non lues")
+    /**
+     * Retourne juste le chiffre des messages non lus pour optimiser les appels réseau du header.
+     */
     public ResponseEntity<Long> getUnreadCount(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         Long count = notificationService.getUnreadCount(currentUser.getId());
@@ -46,14 +58,14 @@ public class SystemNotificationController {
     }
     
     @PostMapping
+    @PreAuthorize("hasRole('admin')")
     @Operation(summary = "Créer une notification", description = "Crée une nouvelle notification système (admin uniquement)")
+    /**
+     * Envoie une notification ciblée à un utilisateur spécifique.
+     */
     public ResponseEntity<SystemNotificationDTO> createNotification(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @RequestBody CreateNotificationRequest request) {
-        if (!"admin".equals(currentUser.getRole())) {
-            return ResponseEntity.status(403).build();
-        }
-        
         SystemNotificationDTO notification = notificationService.createNotification(
             request.getTitle(),
             request.getMessage(),
@@ -67,14 +79,14 @@ public class SystemNotificationController {
     }
     
     @PostMapping("/global")
+    @PreAuthorize("hasRole('admin')")
     @Operation(summary = "Créer une notification globale", description = "Crée une notification pour tous les utilisateurs (admin uniquement)")
+    /**
+     * Diffuse un message à l'ensemble des testeurs et administrateurs de la plateforme.
+     */
     public ResponseEntity<SystemNotificationDTO> createGlobalNotification(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @RequestBody CreateGlobalNotificationRequest request) {
-        if (!"admin".equals(currentUser.getRole())) {
-            return ResponseEntity.status(403).build();
-        }
-        
         SystemNotificationDTO notification = notificationService.createGlobalNotification(
             request.getTitle(),
             request.getMessage(),
@@ -88,6 +100,9 @@ public class SystemNotificationController {
     
     @PatchMapping("/{id}/read")
     @Operation(summary = "Marquer comme lu", description = "Marque une notification comme lue")
+    /**
+     * Action individuelle lorsqu'un utilisateur clique sur une notification précise.
+     */
     public ResponseEntity<SystemNotificationDTO> markAsRead(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
@@ -97,6 +112,9 @@ public class SystemNotificationController {
     
     @PatchMapping("/read-all")
     @Operation(summary = "Tout marquer comme lu", description = "Marque toutes les notifications de l'utilisateur comme lues")
+    /**
+     * Permet de vider rapidement le centre de notifications.
+     */
     public ResponseEntity<Void> markAllAsRead(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         notificationService.markAllAsReadForUser(currentUser.getId());
@@ -104,14 +122,14 @@ public class SystemNotificationController {
     }
     
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('admin')")
     @Operation(summary = "Supprimer une notification", description = "Supprime une notification (admin uniquement)")
+    /**
+     * Suppression physique d'une notification obsolète de la base de données.
+     */
     public ResponseEntity<Void> deleteNotification(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
-        if (!"admin".equals(currentUser.getRole())) {
-            return ResponseEntity.status(403).build();
-        }
-        
         notificationService.deleteNotification(id);
         return ResponseEntity.noContent().build();
     }

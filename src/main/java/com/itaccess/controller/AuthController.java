@@ -41,16 +41,23 @@ import org.springframework.web.bind.annotation.*;
      @PostMapping(value = "/token", consumes = {"application/json", "application/x-www-form-urlencoded"})
      @Operation(summary = "Connexion", description = "Authentifie l'utilisateur et retourne un token JWT")
      public ResponseEntity<TokenResponse> login(
+             /**
+              * Authentification sécurisée. 
+              * Supporte JSON et Form-URL-Encoded.
+              * Capture désormais phoneVersion pour le suivi QA du matériel.
+              */
              @Valid @RequestBody(required = false) LoginRequest requestBody,
              @RequestParam(value = "username", required = false) String username,
              @RequestParam(value = "password", required = false) String password) {
          
           String user = username;
           String pass = password;
+          String phoneVersion = null;
           
          if (requestBody != null) {
              user = requestBody.getUsername();
              pass = requestBody.getPassword();
+             phoneVersion = requestBody.getPhoneVersion();
          }
         
         if (user == null || pass == null || user.isBlank() || pass.isBlank()) {
@@ -86,6 +93,12 @@ import org.springframework.web.bind.annotation.*;
                                  .tokenType("bearer")
                                  .build());
              }
+
+             // Mise à jour de la version du téléphone si fournie
+             if (phoneVersion != null) {
+                 existingUser.setLastPhoneVersion(phoneVersion);
+                 userRepository.save(existingUser);
+             }
              
              String token = jwtTokenProvider.generateToken(authentication);
              
@@ -113,6 +126,9 @@ import org.springframework.web.bind.annotation.*;
      
       @GetMapping("/me")
       @Operation(summary = "Utilisateur actuel", description = "Retourne les informations de l'utilisateur actuellement connecté")
+      /**
+       * Récupère le profil complet de l'utilisateur à partir du SecurityContext.
+       */
       public ResponseEntity<CurrentUserResponse> getCurrentUser() {
           Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
           String username = authentication.getName();
@@ -129,12 +145,19 @@ import org.springframework.web.bind.annotation.*;
       }
      
      @PostMapping("/refresh-secret-key")
+     @Operation(summary = "Régénérer la clé JWT", description = "Force la mise à jour de la clé secrète en base de données")
+     /**
+      * Utilisé pour la rotation de sécurité des tokens.
+      */
      public ResponseEntity<String> refreshSecretKey() {
          settingService.refreshSecretKey();
          return ResponseEntity.ok("SECRET_KEY vérifié/régénéré avec succès");
      }
      
      @PostMapping("/forgot-password")
+     /**
+      * Envoie un lien de réinitialisation si l'email existe.
+      */
      @Operation(summary = "Demande de réinitialisation", description = "Envoie un email de réinitialisation de mot de passe")
      public ResponseEntity<String> forgotPassword(@Valid @RequestBody PasswordResetRequest request) {
          userRepository.findByEmail(request.getEmail()).ifPresent(user -> {
@@ -148,6 +171,9 @@ import org.springframework.web.bind.annotation.*;
      
      @PostMapping("/reset-password")
      @Operation(summary = "Réinitialiser le mot de passe", description = "Réinitialise le mot de passe avec le token reçu")
+     /**
+      * Valide le token de réinitialisation et applique le nouveau mot de passe.
+      */
      public ResponseEntity<String> resetPassword(@Valid @RequestBody PasswordResetConfirm confirm) {
          try {
              String username = jwtTokenProvider.validateResetToken(confirm.getToken());
@@ -167,6 +193,9 @@ import org.springframework.web.bind.annotation.*;
      
       @PostMapping("/init-admin")
       @Operation(summary = "Initialiser l'admin", description = "Crée l'utilisateur admin initial (à utiliser uniquement pour la première configuration)")
+      /**
+       * Route sécurisée par une clé système pour le premier déploiement.
+       */
       public ResponseEntity<String> initAdmin(@RequestParam(required = false) String initKey) {
           // Clé de sécurité pour éviter les créations non autorisées
           if (initKey == null || !initKey.equals(adminInitKey)) {

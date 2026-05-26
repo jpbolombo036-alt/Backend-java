@@ -26,6 +26,9 @@ public class TestController {
     
     @GetMapping
     @Operation(summary = "Liste des tests", description = "Retourne tous les tests")
+    /**
+     * Liste les étapes d'exécution. Peut être filtré par sessionId pour le dashboard.
+     */
     public ResponseEntity<List<TestDTO>> getAllTests(
             @RequestParam(required = false) Long sessionId) {
         if (sessionId != null) {
@@ -36,12 +39,18 @@ public class TestController {
     
     @GetMapping("/{id}")
     @Operation(summary = "Test par ID", description = "Retourne un test par son ID")
+    /**
+     * Récupère une étape précise avec son statut et ses commentaires.
+     */
     public ResponseEntity<TestDTO> getTestById(@PathVariable Long id) {
         return ResponseEntity.ok(testService.getTestById(id));
     }
     
     @PostMapping
     @Operation(summary = "Créer un test", description = "Crée un nouveau test (authentification requise)")
+    /**
+     * Enregistre le résultat d'un pas de test manuel.
+     */
     public ResponseEntity<TestDTO> createTest(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody TestRequest request) {
@@ -55,7 +64,7 @@ public class TestController {
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody TestRequest request) {
-        return ResponseEntity.ok(testService.updateTest(id, request));
+        return ResponseEntity.ok(testService.updateTest(id, request, currentUser.getId(), currentUser.getRole()));
     }
     
     @DeleteMapping("/{id}")
@@ -63,7 +72,7 @@ public class TestController {
     public ResponseEntity<Void> deleteTest(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
-        testService.deleteTest(id);
+        testService.deleteTest(id, currentUser.getId(), currentUser.getRole());
         return ResponseEntity.noContent().build();
     }
 }

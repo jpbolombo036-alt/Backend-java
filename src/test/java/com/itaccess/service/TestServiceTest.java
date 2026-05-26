@@ -35,29 +35,28 @@ class TestServiceTest {
     @InjectMocks
     private TestService testService;
 
-    private com.itaccess.entity.Test test;
+    private com.itaccess.entity.TestStep testStep;
     private TestDTO testDTO;
     private TestRequest testRequest;
 
     @BeforeEach
     void setUp() {
-        test = new com.itaccess.entity.Test();
-        test.setId(1L);
-        test.setSessionId(10L);
-        test.setApplicationId(5L);
-        test.setApplicationNom("TestApp");
-        test.setVersion("1.0");
-        test.setEnvironnement("TEST");
-        test.setFonction("Test fonction");
-        test.setPrecondition("Precondition");
-        test.setEtapes("Etapes");
-        test.setResultatAttendu("Attendu");
-        test.setResultatObtenu("Obtenu");
-        test.setStatut("PASS");
-        test.setCommentaires("Commentaire");
-        test.setCreatedBy(1L);
-        // Nouveau champ testNumber
-        test.setTestNumber(2L);
+        testStep = new com.itaccess.entity.TestStep();
+        testStep.setId(1L);
+        testStep.setSessionId(10L);
+        testStep.setApplicationId(5L);
+        testStep.setApplicationNom("TestApp");
+        testStep.setVersion("1.0");
+        testStep.setEnvironnement("TEST");
+        testStep.setFonction("Test fonction");
+        testStep.setPrecondition("Precondition");
+        testStep.setEtapes("Etapes");
+        testStep.setResultatAttendu("Attendu");
+        testStep.setResultatObtenu("Obtenu");
+        testStep.setStatut("PASS");
+        testStep.setCommentaires("Commentaire");
+        testStep.setCreatedBy(1L);
+        testStep.setTestNumber(2L);
 
         testDTO = new TestDTO();
         testDTO.setId(1L);
@@ -94,7 +93,7 @@ class TestServiceTest {
 
     @Test
     void getAllTests_returnsListOfTestDTOs() {
-        when(testRepository.findAll()).thenReturn(Arrays.asList(test));
+        when(testRepository.findAll()).thenReturn(Arrays.asList(testStep));
 
         List<TestDTO> result = testService.getAllTests();
 
@@ -106,7 +105,7 @@ class TestServiceTest {
 
     @Test
     void getTestsBySessionId_returnsListOfTestDTOs() {
-        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList(test));
+        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList(testStep));
 
         List<TestDTO> result = testService.getTestsBySessionId(10L);
 
@@ -118,7 +117,7 @@ class TestServiceTest {
 
     @Test
     void getTestById_returnsTestDTO_whenExists() {
-        when(testRepository.findById(1L)).thenReturn(Optional.of(test));
+        when(testRepository.findById(1L)).thenReturn(Optional.of(testStep));
 
         TestDTO result = testService.getTestById(1L);
 
@@ -184,42 +183,42 @@ class TestServiceTest {
 
     @Test
     void updateTest_updatesAndReturnsTestDTO() {
-        when(testRepository.findById(1L)).thenReturn(Optional.of(test));
-        when(testRepository.save(any(com.itaccess.entity.Test.class))).thenReturn(test);
+        when(testRepository.findById(1L)).thenReturn(Optional.of(testStep));
+        when(testRepository.save(any(com.itaccess.entity.TestStep.class))).thenReturn(testStep);
 
-        TestDTO result = testService.updateTest(1L, testRequest);
+        TestDTO result = testService.updateTest(1L, testRequest, 1L, "admin");
 
         assertNotNull(result);
         assertEquals(testDTO.getId(), result.getId());
         assertEquals(testDTO.getTestNumber(), result.getTestNumber());
         verify(testRepository, times(1)).findById(1L);
-        verify(testRepository, times(1)).save(any(com.itaccess.entity.Test.class));
+        verify(testRepository, times(1)).save(any(com.itaccess.entity.TestStep.class));
     }
 
     @Test
     void updateTest_throwsResourceNotFoundException_whenNotExists() {
         when(testRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> testService.updateTest(99L, testRequest));
+        assertThrows(ResourceNotFoundException.class, () -> testService.updateTest(99L, testRequest, 1L, "admin"));
         verify(testRepository, times(1)).findById(99L);
     }
 
     @Test
     void deleteTest_deletesTest_whenExists() {
-        when(testRepository.existsById(1L)).thenReturn(true);
+        when(testRepository.findById(1L)).thenReturn(Optional.of(testStep));
 
-        testService.deleteTest(1L);
+        testService.deleteTest(1L, 1L, "admin");
 
-        verify(testRepository, times(1)).existsById(1L);
-        verify(testRepository, times(1)).deleteById(1L);
+        verify(testRepository, times(1)).findById(1L);
+        verify(testRepository, times(1)).delete(any(com.itaccess.entity.TestStep.class));
     }
 
     @Test
     void deleteTest_throwsResourceNotFoundException_whenNotExists() {
-        when(testRepository.existsById(99L)).thenReturn(false);
+        when(testRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> testService.deleteTest(99L));
-        verify(testRepository, times(1)).existsById(99L);
+        assertThrows(ResourceNotFoundException.class, () -> testService.deleteTest(99L, 1L, "admin"));
+        verify(testRepository, times(1)).findById(99L);
     }
 
     @Test

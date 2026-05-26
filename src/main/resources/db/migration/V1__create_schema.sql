@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(50),
     is_active BOOLEAN,
     profile_photo VARCHAR(1000),
-    created_at TIMESTAMP
+    created_at TIMESTAMP,
+    last_phone_version VARCHAR(100)
 );
 
 -- Applications table
