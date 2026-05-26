@@ -48,8 +48,9 @@ public class TestSession {
     @JoinColumn(name = "application_id", insertable = false, updatable = false)
     private Application application;
     
-    @OneToMany(mappedBy = "session", cascade = CascadeType.ALL)
-    private List<Test> tests;
+    // Removed cascade=CascadeType.ALL to prevent unintended deletion of tests
+    @OneToMany(mappedBy = "session")
+    private List<TestStep> tests;
     
     @PrePersist
     protected void onCreate() {

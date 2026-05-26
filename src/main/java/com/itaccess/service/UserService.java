@@ -57,6 +57,9 @@ public class UserService {
         if (userRepository.existsByEmail(dto.getEmail())) {
             throw new IllegalArgumentException("Email déjà enregistré");
         }
+        if (dto.getPassword() == null || dto.getPassword().isBlank()) {
+            throw new IllegalArgumentException("Le mot de passe est requis");
+        }
         
         User user = User.builder()
                 .username(dto.getUsername())
@@ -104,6 +107,16 @@ public class UserService {
             throw new ResourceNotFoundException("Utilisateur non trouvé avec l'ID: " + id);
         }
         userRepository.deleteById(id);
+    }
+    
+    @Transactional
+    public UserDTO toggleUserStatus(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé avec l'ID: " + id));
+        
+        user.setIsActive(!user.getIsActive());
+        User updatedUser = userRepository.save(user);
+        return toDTO(updatedUser);
     }
     
     @Transactional

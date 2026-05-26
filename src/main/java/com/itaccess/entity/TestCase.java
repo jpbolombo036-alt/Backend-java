@@ -3,42 +3,38 @@ package com.itaccess.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
-@Table(name = "todos")
+@Table(name = "test_cases")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Todo {
-    
+public class TestCase {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
-    @Column(nullable = false, length = 200)
+
+    @Column(nullable = false, length = 255)
     private String title;
-    
+
     @Column(columnDefinition = "TEXT")
     private String description;
-    
-    @Column(nullable = false)
-    @Builder.Default
-    private Boolean completed = false;
-    
-    @Column(length = 20)
-    @Builder.Default
-    private String priority = "normal";
-    
-    @Column(name = "due_date", length = 20)
-    private String dueDate;
-    
-    @Column(name = "created_at")
-    private LocalDateTime createdAt;
-    
+
+    @Column(name = "application_id")
+    private Long applicationId;
+
     @Column(name = "created_by")
     private Long createdBy;
-    
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @OneToMany(mappedBy = "testCase", cascade = CascadeType.ALL)
+    private List<TestStep> steps;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

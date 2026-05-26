@@ -32,6 +32,7 @@ public class Message {
     private String content;
     
     @Column(nullable = false)
+    @Builder.Default
     private Boolean read = false;
     
     @Column(name = "timestamp", nullable = false)

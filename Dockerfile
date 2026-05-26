@@ -1,10 +1,16 @@
-FROM eclipse-temurin:17-jdk-alpine AS build
+# Étape 1 : Build
+FROM maven:3.8.5-openjdk-17-slim AS build
 WORKDIR /app
+
+# Copier le pom.xml et télécharger les dépendances (cache)
 COPY pom.xml .
-COPY src src
-RUN apk add --no-cache maven
+RUN mvn dependency:go-offline -B
+
+# Copier le code source et compiler
+COPY src ./src
 RUN mvn clean package -DskipTests
 
+# Étape 2 : Exécution
 FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar

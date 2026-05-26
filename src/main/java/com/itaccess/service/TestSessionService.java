@@ -4,7 +4,7 @@ import com.itaccess.dto.TestDTO;
 import com.itaccess.dto.TestSessionDTO;
 import com.itaccess.dto.TestSessionRequest;
 import com.itaccess.entity.Application;
-import com.itaccess.entity.Test;
+import com.itaccess.entity.TestStep;
 import com.itaccess.entity.TestSession;
 import com.itaccess.entity.User;
 import com.itaccess.exception.ResourceNotFoundException;
@@ -90,7 +90,7 @@ public class TestSessionService {
     }
     
     private TestSessionDTO toDTOWithStats(TestSession session) {
-        List<Test> tests = testRepository.findBySessionId(session.getId());
+        List<TestStep> tests = testRepository.findBySessionId(session.getId());
 
         String applicationNom = null;
         if (session.getApplicationId() != null) {
@@ -131,7 +131,7 @@ public class TestSessionService {
                 .build();
     }
     
-    private TestDTO toTestDTO(Test test) {
+    private TestDTO toTestDTO(TestStep test) {
         return TestDTO.builder()
                 .id(test.getId())
                 .sessionId(test.getSessionId())
@@ -147,6 +147,7 @@ public class TestSessionService {
                 .statut(test.getStatut())
                 .commentaires(test.getCommentaires())
                 .createdBy(test.getCreatedBy())
+                .testNumber(test.getTestNumber())
                 .build();
     }
 }

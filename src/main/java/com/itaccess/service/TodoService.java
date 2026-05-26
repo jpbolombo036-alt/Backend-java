@@ -2,8 +2,11 @@ package com.itaccess.service;
 
 import com.itaccess.dto.TodoDTO;
 import com.itaccess.dto.TodoRequest;
+import com.itaccess.dto.UserWithTodosDTO;
 import com.itaccess.entity.Todo;
+import com.itaccess.entity.User;
 import com.itaccess.repository.TodoRepository;
+import com.itaccess.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +19,7 @@ import java.util.stream.Collectors;
 public class TodoService {
     
     private final TodoRepository todoRepository;
+    private final UserRepository userRepository;
     
     public List<TodoDTO> getAll() {
         return todoRepository.findAll()
@@ -52,10 +56,14 @@ public class TodoService {
     }
     
     @Transactional
-    public TodoDTO update(Long id, TodoRequest request) {
+    public TodoDTO update(Long id, TodoRequest request, Long userId, String userRole) {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Todo not found"));
         
+        if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à modifier cette tâche");
+        }
+
         if (request.getTitle() != null) {
             todo.setTitle(request.getTitle());
         }
@@ -76,17 +84,52 @@ public class TodoService {
     }
     
     @Transactional
-    public void delete(Long id) {
+    public void delete(Long id, Long userId, String userRole) {
+        Todo todo = todoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Todo not found"));
+
+        if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à supprimer cette tâche");
+        }
         todoRepository.deleteById(id);
     }
     
     @Transactional
-    public TodoDTO toggleComplete(Long id) {
+    public TodoDTO toggleComplete(Long id, Long userId, String userRole) {
         Todo todo = todoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Todo not found"));
         
+        if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à modifier cette tâche");
+        }
+
         todo.setCompleted(!todo.getCompleted());
         return toDTO(todoRepository.save(todo));
+    }
+    
+    public List<UserWithTodosDTO> getUsersWithTodos() {
+        List<Long> userIds = todoRepository.findDistinctCreatedBy();
+        List<User> users = userRepository.findByIdIn(userIds);
+        
+        return users.stream()
+                .map(user -> {
+                    List<TodoDTO> userTodos = todoRepository.findByCreatedByOrderByCreatedAtDesc(user.getId())
+                            .stream()
+                            .map(this::toDTO)
+                            .collect(Collectors.toList());
+                    
+                    return UserWithTodosDTO.builder()
+                            .id(user.getId())
+                            .username(user.getUsername())
+                            .email(user.getEmail())
+                            .role(user.getRole())
+                            .isActive(user.getIsActive())
+                            .profilePhoto(user.getProfilePhoto())
+                            .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)
+                            .todos(userTodos)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
     
     private TodoDTO toDTO(Todo todo) {

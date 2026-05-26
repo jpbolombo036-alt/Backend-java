@@ -22,4 +22,6 @@ public class TestDTO {
     private String statut;
     private String commentaires;
     private Long createdBy;
+    // Nouveau champ pour le numéro de test séquentiel par session
+    private Long testNumber;
 }

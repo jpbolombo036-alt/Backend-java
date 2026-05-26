@@ -5,6 +5,7 @@ import com.itaccess.dto.PasswordChangeRequest;
 import com.itaccess.dto.UserDTO;
 import com.itaccess.security.CurrentUser;
 import com.itaccess.security.UserInfo;
+import com.itaccess.security.UserInfo;
 import com.itaccess.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -71,6 +72,13 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
     
+    @PatchMapping("/{id}/toggle-status")
+    @PreAuthorize("hasRole('admin')")
+    @Operation(summary = "Désactiver/Réactiver un utilisateur", description = "Désactive ou réactive un utilisateur (admin uniquement)")
+    public ResponseEntity<UserDTO> toggleUserStatus(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.toggleUserStatus(id));
+    }
+    
     @GetMapping("/me")
     @Operation(summary = "Profil actuel", description = "Retourne le profil de l'utilisateur connecté")
     public ResponseEntity<UserDTO> getCurrentUser(@Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
@@ -85,12 +93,12 @@ public class UserController {
         return ResponseEntity.ok(userService.updateUserProfile(currentUser.getId(), dto));
     }
     
-    @PutMapping("/me/password")
-    @Operation(summary = "Changer le mot de passe", description = "Change le mot de passe de l'utilisateur connecté")
-    public ResponseEntity<Void> changePassword(
-            @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
-            @RequestBody PasswordChangeRequest request) {
-        userService.changePassword(currentUser.getId(), request.getOldPassword(), request.getNewPassword());
-        return ResponseEntity.ok().build();
-    }
+     @PutMapping("/me/password")
+     @Operation(summary = "Changer le mot de passe", description = "Change le mot de passe de l'utilisateur connecté")
+     public ResponseEntity<Void> changePassword(
+             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
+             @Valid @RequestBody PasswordChangeRequest request) {
+         userService.changePassword(currentUser.getId(), request.getOldPassword(), request.getNewPassword());
+         return ResponseEntity.ok().build();
+     }
 }
