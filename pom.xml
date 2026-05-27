@@ -154,6 +154,16 @@
                     </excludes>
                 </configuration>
             </plugin>
+            <plugin>
+                <groupId>org.flywaydb</groupId>
+                <artifactId>flyway-maven-plugin</artifactId>
+                <version>9.22.3</version>
+                <configuration>
+                    <url>${SPRING_DATASOURCE_URL}</url>
+                    <user>${SPRING_DATASOURCE_USERNAME}</user>
+                    <password>${SPRING_DATASOURCE_PASSWORD}</password>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 </project>
