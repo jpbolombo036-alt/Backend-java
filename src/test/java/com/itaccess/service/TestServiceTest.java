@@ -139,20 +139,14 @@ class TestServiceTest {
         // Préparer les mocks pour la logique de création
         when(applicationRepository.existsById(5L)).thenReturn(true);
         when(testSessionRepository.existsById(10L)).thenReturn(true);
-<<<<<<< HEAD
         when(testRepository.findMaxTestNumberBySessionId(10L)).thenReturn(Optional.empty()); // aucun test -> 1
         when(testRepository.save(any(com.itaccess.entity.TestStep.class))).thenReturn(testStep);
-=======
-        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList()); // Liste vide -> premier test = 1
-        when(testRepository.save(any(com.itaccess.entity.Test.class))).thenReturn(test);
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 
         TestDTO result = testService.createTest(testRequest, 1L);
 
         assertNotNull(result);
         
         // Capturer l'objet envoyé au repository pour vérifier le testNumber calculé
-<<<<<<< HEAD
         ArgumentCaptor<com.itaccess.entity.TestStep> testCaptor = ArgumentCaptor.forClass(com.itaccess.entity.TestStep.class);
         verify(testRepository).save(testCaptor.capture());
         
@@ -160,15 +154,6 @@ class TestServiceTest {
         assertEquals(1L, savedTest.getTestNumber()); // Doit être 1 car findBySessionId a retourné une liste vide
         assertEquals("TestApp", savedTest.getApplicationNom());
         verify(testRepository, times(1)).save(any(com.itaccess.entity.TestStep.class));
-=======
-        ArgumentCaptor<com.itaccess.entity.Test> testCaptor = ArgumentCaptor.forClass(com.itaccess.entity.Test.class);
-        verify(testRepository).save(testCaptor.capture());
-        
-        com.itaccess.entity.Test savedTest = testCaptor.getValue();
-        assertEquals(1L, savedTest.getTestNumber()); // Doit être 1 car findBySessionId a retourné une liste vide
-        assertEquals("TestApp", savedTest.getApplicationNom());
-        verify(testRepository, times(1)).save(any(com.itaccess.entity.Test.class));
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     }
 
     @Test
@@ -238,11 +223,7 @@ class TestServiceTest {
 
     @Test
     void getNextTestNumberForSession_returnsOne_whenNoExistingTests() {
-<<<<<<< HEAD
         when(testRepository.findMaxTestNumberBySessionId(10L)).thenReturn(Optional.empty());
-=======
-        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList());
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 
         Long result = testService.getNextTestNumberForSession(10L);
 
@@ -251,17 +232,7 @@ class TestServiceTest {
 
     @Test
     void getNextTestNumberForSession_returnsNextNumber_whenExistingTests() {
-<<<<<<< HEAD
         when(testRepository.findMaxTestNumberBySessionId(10L)).thenReturn(Optional.of(3L));
-=======
-        com.itaccess.entity.Test test1 = new com.itaccess.entity.Test();
-        test1.setTestNumber(1L);
-        test1.setSessionId(10L);
-        com.itaccess.entity.Test test2 = new com.itaccess.entity.Test();
-        test2.setTestNumber(3L);
-        test2.setSessionId(10L);
-        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList(test1, test2));
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 
         Long result = testService.getNextTestNumberForSession(10L);
 

@@ -54,12 +54,9 @@ public class TestController {
     public ResponseEntity<TestDTO> createTest(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody TestRequest request) {
-<<<<<<< HEAD
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         TestDTO created = testService.createTest(request, currentUser.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -70,12 +67,9 @@ public class TestController {
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody TestRequest request) {
-<<<<<<< HEAD
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         return ResponseEntity.ok(testService.updateTest(id, request, currentUser.getId(), currentUser.getRole()));
     }
     
@@ -84,12 +78,9 @@ public class TestController {
     public ResponseEntity<Void> deleteTest(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
-<<<<<<< HEAD
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         testService.deleteTest(id, currentUser.getId(), currentUser.getRole());
         return ResponseEntity.noContent().build();
     }

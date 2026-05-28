@@ -4,11 +4,7 @@ import com.itaccess.dto.TestDTO;
 import com.itaccess.dto.TestSessionDTO;
 import com.itaccess.dto.TestSessionRequest;
 import com.itaccess.entity.Application;
-<<<<<<< HEAD
 import com.itaccess.entity.TestStep;
-=======
-import com.itaccess.entity.Test;
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import com.itaccess.entity.TestSession;
 import com.itaccess.entity.User;
 import com.itaccess.exception.ResourceNotFoundException;
@@ -20,13 +16,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-<<<<<<< HEAD
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,7 +32,6 @@ public class TestSessionService {
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     
-<<<<<<< HEAD
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     public List<TestSessionDTO> getAllTestSessions() {
@@ -48,18 +40,6 @@ public class TestSessionService {
     
     public List<TestSessionDTO> getTestSessionsByUser(Long userId) {
         return toOptimizedDTOList(testSessionRepository.findByCreatedBy(userId));
-=======
-    public List<TestSessionDTO> getAllTestSessions() {
-        return testSessionRepository.findAll().stream()
-                .map(this::toDTOWithStats)
-                .collect(Collectors.toList());
-    }
-    
-    public List<TestSessionDTO> getTestSessionsByUser(Long userId) {
-        return testSessionRepository.findByCreatedBy(userId).stream()
-                .map(this::toDTOWithStats)
-                .collect(Collectors.toList());
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     }
     
     public TestSessionDTO getTestSessionById(Long id) {
@@ -111,7 +91,6 @@ public class TestSessionService {
         testSessionRepository.deleteById(id);
     }
     
-<<<<<<< HEAD
     private List<TestSessionDTO> toOptimizedDTOList(List<TestSession> sessions) {
         if (sessions.isEmpty()) return Collections.emptyList();
 
@@ -145,25 +124,6 @@ public class TestSessionService {
     }
 
     private TestSessionDTO buildDTO(TestSession session, List<TestStep> tests, String appNom, String userNom) {
-=======
-    private TestSessionDTO toDTOWithStats(TestSession session) {
-        List<Test> tests = testRepository.findBySessionId(session.getId());
-
-        String applicationNom = null;
-        if (session.getApplicationId() != null) {
-            applicationNom = applicationRepository.findById(session.getApplicationId())
-                    .map(Application::getNom)
-                    .orElse(null);
-        }
-
-        String createdByUsername = null;
-        if (session.getCreatedBy() != null) {
-            createdByUsername = userRepository.findById(session.getCreatedBy())
-                    .map(User::getUsername)
-                    .orElse(null);
-        }
-
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         long testsOk = tests.stream().filter(t -> "OK".equals(t.getStatut())).count();
         long testsBug = tests.stream().filter(t -> "BUG".equals(t.getStatut())).count();
         long testsEnCours = tests.stream().filter(t -> "EN COURS".equals(t.getStatut())).count();
@@ -173,22 +133,14 @@ public class TestSessionService {
                 .nom(session.getNom())
                 .description(session.getDescription())
                 .applicationId(session.getApplicationId())
-<<<<<<< HEAD
                 .applicationNom(appNom)
-=======
-                .applicationNom(applicationNom)
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
                 .environnement(session.getEnvironnement())
                 .version(session.getVersion())
                 .nomDocument(session.getNomDocument())
                 .dateCreation(session.getDateCreation())
                 .statut(session.getStatut())
                 .createdBy(session.getCreatedBy())
-<<<<<<< HEAD
                 .createdByUsername(userNom)
-=======
-                .createdByUsername(createdByUsername)
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
                 .tests(tests.stream().map(this::toTestDTO).collect(Collectors.toList()))
                 .totalTests(tests.size())
                 .testsOk((int) testsOk)
@@ -197,11 +149,7 @@ public class TestSessionService {
                 .build();
     }
     
-<<<<<<< HEAD
     private TestDTO toTestDTO(TestStep test) {
-=======
-    private TestDTO toTestDTO(Test test) {
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         return TestDTO.builder()
                 .id(test.getId())
                 .sessionId(test.getSessionId())

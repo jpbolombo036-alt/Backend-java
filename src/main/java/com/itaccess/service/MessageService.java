@@ -4,10 +4,7 @@ import com.itaccess.dto.MessageDTO;
 import com.itaccess.dto.MessageRequest;
 import com.itaccess.entity.Message;
 import com.itaccess.entity.User;
-<<<<<<< HEAD
 import com.itaccess.exception.ResourceNotFoundException;
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import com.itaccess.repository.MessageRepository;
 import com.itaccess.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -63,15 +60,9 @@ public class MessageService {
     @Transactional
     public MessageDTO create(MessageRequest request, Long senderId) {
         User sender = userRepository.findById(senderId)
-<<<<<<< HEAD
                 .orElseThrow(() -> new ResourceNotFoundException("Expéditeur non trouvé avec l'ID: " + senderId));
         User receiver = userRepository.findById(request.getReceiverId())
                 .orElseThrow(() -> new ResourceNotFoundException("Destinataire non trouvé avec l'ID: " + request.getReceiverId()));
-=======
-                .orElseThrow(() -> new RuntimeException("Sender not found"));
-        User receiver = userRepository.findById(request.getReceiverId())
-                .orElseThrow(() -> new RuntimeException("Receiver not found"));
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         
         Message message = Message.builder()
                 .senderId(senderId)
@@ -88,11 +79,7 @@ public class MessageService {
     @Transactional
     public MessageDTO markAsRead(Long messageId) {
         Message message = messageRepository.findById(messageId)
-<<<<<<< HEAD
                 .orElseThrow(() -> new ResourceNotFoundException("Message non trouvé avec l'ID: " + messageId));
-=======
-                .orElseThrow(() -> new RuntimeException("Message not found"));
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         
         message.setRead(true);
         return toDTO(messageRepository.save(message));

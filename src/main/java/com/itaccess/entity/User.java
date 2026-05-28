@@ -35,12 +35,9 @@ public class User {
     @Column(name = "profile_photo", length = 1000)
     private String profilePhoto;
     
-<<<<<<< HEAD
     @Column(name = "last_phone_version")
     private String lastPhoneVersion;
     
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     

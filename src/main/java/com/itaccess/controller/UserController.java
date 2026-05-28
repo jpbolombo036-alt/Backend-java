@@ -5,10 +5,6 @@ import com.itaccess.dto.PasswordChangeRequest;
 import com.itaccess.dto.UserDTO;
 import com.itaccess.security.CurrentUser;
 import com.itaccess.security.UserInfo;
-<<<<<<< HEAD
-=======
-import com.itaccess.security.UserInfo;
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import com.itaccess.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -50,12 +46,9 @@ public class UserController {
     @GetMapping("/available")
     @Operation(summary = "Utilisateurs disponibles", description = "Retourne la liste des utilisateurs disponibles pour discuter (tous les utilisateurs)")
     public ResponseEntity<java.util.List<UserDTO>> getAvailableUsers(@Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
-<<<<<<< HEAD
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         return ResponseEntity.ok(userService.getAvailableUsers(currentUser.getId()));
     }
     
@@ -91,12 +84,9 @@ public class UserController {
     @GetMapping("/me")
     @Operation(summary = "Profil actuel", description = "Retourne le profil de l'utilisateur connecté")
     public ResponseEntity<UserDTO> getCurrentUser(@Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
-<<<<<<< HEAD
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         return ResponseEntity.ok(userService.getUserById(currentUser.getId()));
     }
     
@@ -105,12 +95,9 @@ public class UserController {
     public ResponseEntity<UserDTO> updateCurrentUser(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody UserDTO dto) {
-<<<<<<< HEAD
         if (currentUser == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         return ResponseEntity.ok(userService.updateUserProfile(currentUser.getId(), dto));
     }
     
@@ -119,12 +106,9 @@ public class UserController {
      public ResponseEntity<Void> changePassword(
              @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
              @Valid @RequestBody PasswordChangeRequest request) {
-<<<<<<< HEAD
          if (currentUser == null) {
              return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
          }
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
          userService.changePassword(currentUser.getId(), request.getOldPassword(), request.getNewPassword());
          return ResponseEntity.ok().build();
      }

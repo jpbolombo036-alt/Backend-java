@@ -32,10 +32,7 @@ public class Message {
     private String content;
     
     @Column(nullable = false)
-<<<<<<< HEAD
     @Builder.Default
-=======
->>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     private Boolean read = false;
     
     @Column(name = "timestamp", nullable = false)
