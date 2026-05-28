@@ -2,7 +2,10 @@ package com.itaccess.service;
 
 import com.itaccess.dto.SystemNotificationDTO;
 import com.itaccess.entity.SystemNotification;
+<<<<<<< HEAD
 import com.itaccess.exception.ResourceNotFoundException;
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import com.itaccess.repository.SystemNotificationRepository;
 import com.itaccess.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +13,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+<<<<<<< HEAD
 import java.time.format.DateTimeFormatter;
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,16 +27,43 @@ public class SystemNotificationService {
     private final SystemNotificationRepository notificationRepository;
     private final UserRepository userRepository;
     
+<<<<<<< HEAD
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     
     public List<SystemNotificationDTO> getUserNotifications(Long userId) {
         return notificationRepository.findAllByUserIdOrderByCreatedAtDesc(userId).stream()
+=======
+    public List<SystemNotificationDTO> getUserNotifications(Long userId) {
+        List<SystemNotification> notifications = notificationRepository.findByTargetUserIdOrderByCreatedAtDesc(userId);
+        List<SystemNotification> globalNotifications = notificationRepository.findByTargetUserIdIsNullOrderByCreatedAtDesc();
+        
+        // Fusionner les notifications personnelles et globales
+        notifications.addAll(globalNotifications);
+        
+        // Trier par date
+        notifications.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        
+        return notifications.stream()
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
     
     public List<SystemNotificationDTO> getUnreadNotifications(Long userId) {
+<<<<<<< HEAD
         return notificationRepository.findAllUnreadByUserIdOrderByCreatedAtDesc(userId).stream()
+=======
+        List<SystemNotification> notifications = notificationRepository.findByTargetUserIdAndReadFalseOrderByCreatedAtDesc(userId);
+        List<SystemNotification> globalNotifications = notificationRepository.findByTargetUserIdIsNullAndReadFalseOrderByCreatedAtDesc();
+        
+        // Fusionner les notifications personnelles et globales non lues
+        notifications.addAll(globalNotifications);
+        
+        // Trier par date
+        notifications.sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt()));
+        
+        return notifications.stream()
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -72,7 +105,11 @@ public class SystemNotificationService {
     @Transactional
     public SystemNotificationDTO markAsRead(Long notificationId) {
         SystemNotification notification = notificationRepository.findById(notificationId)
+<<<<<<< HEAD
                 .orElseThrow(() -> new ResourceNotFoundException("Notification non trouvée avec l'ID: " + notificationId));
+=======
+                .orElseThrow(() -> new RuntimeException("Notification not found"));
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         
         notification.setRead(true);
         return toDTO(notificationRepository.save(notification));
@@ -80,7 +117,19 @@ public class SystemNotificationService {
     
     @Transactional
     public void markAllAsReadForUser(Long userId) {
+<<<<<<< HEAD
         notificationRepository.markAllAsReadByUserId(userId);
+=======
+        List<SystemNotification> unreadNotifications = notificationRepository.findByTargetUserIdAndReadFalseOrderByCreatedAtDesc(userId);
+        List<SystemNotification> unreadGlobalNotifications = notificationRepository.findByTargetUserIdIsNullAndReadFalseOrderByCreatedAtDesc();
+        
+        // Marquer toutes les notifications non lues comme lues
+        unreadNotifications.forEach(n -> n.setRead(true));
+        unreadGlobalNotifications.forEach(n -> n.setRead(true));
+        
+        notificationRepository.saveAll(unreadNotifications);
+        notificationRepository.saveAll(unreadGlobalNotifications);
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     }
     
     @Transactional
@@ -104,7 +153,11 @@ public class SystemNotificationService {
                 .read(notification.getRead())
                 .targetUserId(notification.getTargetUserId())
                 .createdBy(notification.getCreatedBy())
+<<<<<<< HEAD
                 .createdAt(notification.getCreatedAt() != null ? notification.getCreatedAt().format(DATE_FORMATTER) : null)
+=======
+                .createdAt(notification.getCreatedAt().toString())
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
                 .actionUrl(notification.getActionUrl())
                 .build();
     }

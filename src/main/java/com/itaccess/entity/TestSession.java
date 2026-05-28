@@ -50,7 +50,11 @@ public class TestSession {
     
     // Removed cascade=CascadeType.ALL to prevent unintended deletion of tests
     @OneToMany(mappedBy = "session")
+<<<<<<< HEAD
     private List<TestStep> tests;
+=======
+    private List<Test> tests;
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     
     @PrePersist
     protected void onCreate() {

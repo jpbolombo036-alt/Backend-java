@@ -23,7 +23,10 @@ public class Todo {
     private String description;
     
     @Column(nullable = false)
+<<<<<<< HEAD
     @Builder.Default
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     private Boolean completed = false;
     
     @Column(length = 20)

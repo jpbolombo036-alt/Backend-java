@@ -15,7 +15,10 @@ import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+<<<<<<< HEAD
 import org.springframework.security.test.context.support.WithMockUser;
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -125,7 +128,10 @@ class AuthControllerIntegrationTest {
     }
     
     @Test
+<<<<<<< HEAD
     @WithMockUser(username = "testuser", roles = "user")
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     void getCurrentUser_ShouldReturnCurrentUser_WhenAuthenticated() throws Exception {
         when(userRepository.findByUsername("testuser")).thenReturn(java.util.Optional.of(testUser));
         

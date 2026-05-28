@@ -39,7 +39,11 @@ public class Application {
     private List<Compte> comptes;
     
     @OneToMany(mappedBy = "application", cascade = CascadeType.ALL)
+<<<<<<< HEAD
     private List<TestStep> tests;
+=======
+    private List<Test> tests;
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     
     @PrePersist
     protected void onCreate() {

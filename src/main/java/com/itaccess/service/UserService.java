@@ -14,7 +14,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+<<<<<<< HEAD
 import java.time.format.DateTimeFormatter;
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -25,8 +28,11 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     
+<<<<<<< HEAD
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     public PageResponse<UserDTO> getAllUsers(int page, int size, String sortBy, String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
@@ -40,7 +46,12 @@ public class UserService {
     }
     
     public List<UserDTO> getAvailableUsers(Long currentUserId) {
+<<<<<<< HEAD
         return userRepository.findByIdNot(currentUserId).stream()
+=======
+        return userRepository.findAll().stream()
+                .filter(user -> !user.getId().equals(currentUserId))
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -91,10 +102,13 @@ public class UserService {
             user.setRole(dto.getRole());
         }
         
+<<<<<<< HEAD
         if (dto.getLastPhoneVersion() != null) {
             user.setLastPhoneVersion(dto.getLastPhoneVersion());
         }
 
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
         if (dto.getIsActive() != null) {
             user.setIsActive(dto.getIsActive());
         }
@@ -166,7 +180,10 @@ public class UserService {
                 .role(user.getRole())
                 .isActive(user.getIsActive())
                 .profilePhoto(user.getProfilePhoto())
+<<<<<<< HEAD
                 .lastPhoneVersion(user.getLastPhoneVersion())
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
                 .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)
                 .build();
     }

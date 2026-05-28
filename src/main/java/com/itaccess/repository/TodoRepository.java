@@ -15,6 +15,9 @@ public interface TodoRepository extends JpaRepository<Todo, Long> {
     
     @Query("SELECT DISTINCT t.createdBy FROM Todo t WHERE t.createdBy IS NOT NULL")
     List<Long> findDistinctCreatedBy();
+<<<<<<< HEAD
 
     List<Todo> findByCreatedByInOrderByCreatedAtDesc(List<Long> createdByList);
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 }

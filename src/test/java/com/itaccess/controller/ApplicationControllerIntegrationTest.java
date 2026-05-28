@@ -11,9 +11,12 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+<<<<<<< HEAD
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -47,6 +50,7 @@ class ApplicationControllerIntegrationTest {
                 .environnement("Production")
                 .createdBy(1L)
                 .build();
+<<<<<<< HEAD
 
         when(applicationRepository.findAll(any(Pageable.class)))
                 .thenReturn(new PageImpl<>(java.util.List.of(testApplication), PageRequest.of(0, 10), 1));
@@ -54,6 +58,11 @@ class ApplicationControllerIntegrationTest {
     
     @Test
     @WithMockUser(username = "admin", roles = "admin")
+=======
+    }
+    
+    @Test
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     void getAllApplications_ShouldReturnPageOfApplications_WhenAuthenticated() throws Exception {
         mockMvc.perform(get("/applications")
                 .param("page", "0")
@@ -67,7 +76,10 @@ class ApplicationControllerIntegrationTest {
     }
     
     @Test
+<<<<<<< HEAD
     @WithMockUser(username = "admin", roles = "admin")
+=======
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     void getApplicationById_ShouldReturnApplication_WhenApplicationExists() throws Exception {
         when(applicationRepository.findById(1L)).thenReturn(java.util.Optional.of(testApplication));
         
@@ -78,7 +90,11 @@ class ApplicationControllerIntegrationTest {
     }
     
     @Test
+<<<<<<< HEAD
     @WithMockUser(username = "admin", roles = "admin")
+=======
+    @WithMockUser
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     void createApplication_ShouldReturnCreated_WhenValidData() throws Exception {
         ApplicationDTO applicationDTO = ApplicationDTO.builder()
                 .nom("New App")
@@ -97,7 +113,11 @@ class ApplicationControllerIntegrationTest {
     }
     
     @Test
+<<<<<<< HEAD
     @WithMockUser(username = "admin", roles = "admin")
+=======
+    @WithMockUser
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     void updateApplication_ShouldReturnOk_WhenValidData() throws Exception {
         ApplicationDTO applicationDTO = ApplicationDTO.builder()
                 .nom("Updated App")
@@ -116,7 +136,11 @@ class ApplicationControllerIntegrationTest {
     }
     
     @Test
+<<<<<<< HEAD
     @WithMockUser(username = "admin", roles = "admin")
+=======
+    @WithMockUser
+>>>>>>> 600760be4eddc08aedfb158f3a1521a71faeebf0
     void deleteApplication_ShouldReturnNoContent_WhenApplicationExists() throws Exception {
         when(applicationRepository.findById(1L)).thenReturn(java.util.Optional.of(testApplication));
         
