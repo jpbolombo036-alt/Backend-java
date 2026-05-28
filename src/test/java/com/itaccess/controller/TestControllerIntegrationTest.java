@@ -103,7 +103,7 @@ class TestControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void getAllTests_ShouldReturnListOfTests() throws Exception {
         when(testRepository.findAll()).thenReturn(Arrays.asList(testStep));
 
@@ -117,7 +117,7 @@ class TestControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void getTestsBySessionId_ShouldReturnFilteredTests() throws Exception {
         when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList(testStep));
 
@@ -130,7 +130,7 @@ class TestControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void getTestById_ShouldReturnTest_WhenExists() throws Exception {
         when(testRepository.findById(1L)).thenReturn(Optional.of(testStep));
 
@@ -142,7 +142,7 @@ class TestControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void getTestById_ShouldReturnNotFound_WhenNotExists() throws Exception {
         when(testRepository.findById(99L)).thenReturn(Optional.empty());
 
@@ -151,7 +151,7 @@ class TestControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void createTest_ShouldReturnCreated_WhenValidData() throws Exception {
         when(applicationRepository.existsById(5L)).thenReturn(true);
         when(testSessionRepository.existsById(10L)).thenReturn(true);
@@ -172,9 +172,10 @@ class TestControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void createTest_ShouldReturnBadRequest_WhenSessionIdIsZero() throws Exception {
         testRequest.setSessionId(0L);
+        when(applicationRepository.existsById(5L)).thenReturn(true);
 
         mockMvc.perform(post("/tests")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -183,7 +184,7 @@ class TestControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void updateTest_ShouldReturnOk_WhenValidData() throws Exception {
         when(testRepository.findById(1L)).thenReturn(Optional.of(testStep));
         when(testRepository.save(any(com.itaccess.entity.TestStep.class))).thenReturn(testStep);
@@ -197,18 +198,18 @@ class TestControllerIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void deleteTest_ShouldReturnNoContent_WhenExists() throws Exception {
-        when(testRepository.existsById(1L)).thenReturn(true);
+        when(testRepository.findById(1L)).thenReturn(Optional.of(testStep));
 
         mockMvc.perform(delete("/tests/1"))
                 .andExpect(status().isNoContent());
     }
 
     @Test
-    @WithMockUser(roles = "user")
+    @WithMockUser(username = "admin", roles = "admin")
     void deleteTest_ShouldReturnNotFound_WhenNotExists() throws Exception {
-        when(testRepository.existsById(99L)).thenReturn(false);
+        when(testRepository.findById(99L)).thenReturn(Optional.empty());
 
         mockMvc.perform(delete("/tests/99"))
                 .andExpect(status().isNotFound());

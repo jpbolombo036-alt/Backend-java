@@ -16,6 +16,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Objects;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,16 +32,14 @@ public class TestSessionService {
     private final ApplicationRepository applicationRepository;
     private final UserRepository userRepository;
     
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
     public List<TestSessionDTO> getAllTestSessions() {
-        return testSessionRepository.findAll().stream()
-                .map(this::toDTOWithStats)
-                .collect(Collectors.toList());
+        return toOptimizedDTOList(testSessionRepository.findAll());
     }
     
     public List<TestSessionDTO> getTestSessionsByUser(Long userId) {
-        return testSessionRepository.findByCreatedBy(userId).stream()
-                .map(this::toDTOWithStats)
-                .collect(Collectors.toList());
+        return toOptimizedDTOList(testSessionRepository.findByCreatedBy(userId));
     }
     
     public TestSessionDTO getTestSessionById(Long id) {
@@ -89,23 +91,39 @@ public class TestSessionService {
         testSessionRepository.deleteById(id);
     }
     
+    private List<TestSessionDTO> toOptimizedDTOList(List<TestSession> sessions) {
+        if (sessions.isEmpty()) return Collections.emptyList();
+
+        List<Long> sessionIds = sessions.stream().map(TestSession::getId).collect(Collectors.toList());
+        List<Long> appIds = sessions.stream().map(TestSession::getApplicationId).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+        List<Long> userIds = sessions.stream().map(TestSession::getCreatedBy).filter(Objects::nonNull).distinct().collect(Collectors.toList());
+
+        Map<Long, List<TestStep>> testsBySession = testRepository.findBySessionIdIn(sessionIds).stream()
+                .collect(Collectors.groupingBy(TestStep::getSessionId));
+        Map<Long, String> appNames = applicationRepository.findAllById(appIds).stream()
+                .collect(Collectors.toMap(Application::getId, Application::getNom));
+        Map<Long, String> userNames = userRepository.findByIdIn(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getUsername));
+
+        return sessions.stream()
+                .map(s -> buildDTO(s, 
+                        testsBySession.getOrDefault(s.getId(), Collections.emptyList()),
+                        appNames.get(s.getApplicationId()),
+                        userNames.get(s.getCreatedBy())))
+                .collect(Collectors.toList());
+    }
+
     private TestSessionDTO toDTOWithStats(TestSession session) {
         List<TestStep> tests = testRepository.findBySessionId(session.getId());
+        String appName = session.getApplicationId() != null ? 
+                applicationRepository.findById(session.getApplicationId()).map(Application::getNom).orElse(null) : null;
+        String userName = session.getCreatedBy() != null ? 
+                userRepository.findById(session.getCreatedBy()).map(User::getUsername).orElse(null) : null;
+        
+        return buildDTO(session, tests, appName, userName);
+    }
 
-        String applicationNom = null;
-        if (session.getApplicationId() != null) {
-            applicationNom = applicationRepository.findById(session.getApplicationId())
-                    .map(Application::getNom)
-                    .orElse(null);
-        }
-
-        String createdByUsername = null;
-        if (session.getCreatedBy() != null) {
-            createdByUsername = userRepository.findById(session.getCreatedBy())
-                    .map(User::getUsername)
-                    .orElse(null);
-        }
-
+    private TestSessionDTO buildDTO(TestSession session, List<TestStep> tests, String appNom, String userNom) {
         long testsOk = tests.stream().filter(t -> "OK".equals(t.getStatut())).count();
         long testsBug = tests.stream().filter(t -> "BUG".equals(t.getStatut())).count();
         long testsEnCours = tests.stream().filter(t -> "EN COURS".equals(t.getStatut())).count();
@@ -115,14 +133,14 @@ public class TestSessionService {
                 .nom(session.getNom())
                 .description(session.getDescription())
                 .applicationId(session.getApplicationId())
-                .applicationNom(applicationNom)
+                .applicationNom(appNom)
                 .environnement(session.getEnvironnement())
                 .version(session.getVersion())
                 .nomDocument(session.getNomDocument())
                 .dateCreation(session.getDateCreation())
                 .statut(session.getStatut())
                 .createdBy(session.getCreatedBy())
-                .createdByUsername(createdByUsername)
+                .createdByUsername(userNom)
                 .tests(tests.stream().map(this::toTestDTO).collect(Collectors.toList()))
                 .totalTests(tests.size())
                 .testsOk((int) testsOk)

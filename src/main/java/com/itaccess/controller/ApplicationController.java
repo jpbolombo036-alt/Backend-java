@@ -43,6 +43,9 @@ public class ApplicationController {
     public ResponseEntity<ApplicationDTO> createApplication(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody ApplicationDTO dto) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         ApplicationDTO created = applicationService.createApplication(dto, currentUser.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -53,6 +56,9 @@ public class ApplicationController {
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody ApplicationDTO dto) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         return ResponseEntity.ok(applicationService.updateApplication(id, dto, currentUser.getId(), currentUser.getRole()));
     }
     
@@ -61,6 +67,9 @@ public class ApplicationController {
     public ResponseEntity<Void> deleteApplication(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         applicationService.deleteApplication(id, currentUser.getId(), currentUser.getRole());
         return ResponseEntity.noContent().build();
     }

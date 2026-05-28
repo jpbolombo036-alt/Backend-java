@@ -11,6 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
@@ -48,6 +51,9 @@ class UserControllerIntegrationTest {
                 .role("user")
                 .isActive(true)
                 .build();
+
+        when(userRepository.findAll(any(Pageable.class)))
+                .thenReturn(new PageImpl<>(java.util.List.of(testUser), PageRequest.of(0, 10), 1));
     }
     
     @Test
@@ -72,8 +78,10 @@ class UserControllerIntegrationTest {
     }
     
     @Test
+    @WithMockUser(username = "testuser", roles = "user")
     void getCurrentUser_ShouldReturnCurrentUser_WhenAuthenticated() throws Exception {
-        when(userRepository.findByUsername("user")).thenReturn(java.util.Optional.of(testUser));
+        when(userRepository.findByUsername("testuser")).thenReturn(java.util.Optional.of(testUser));
+        when(userRepository.findById(1L)).thenReturn(java.util.Optional.of(testUser));
         
         mockMvc.perform(get("/users/me"))
                 .andExpect(status().isOk());

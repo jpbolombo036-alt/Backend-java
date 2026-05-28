@@ -54,6 +54,9 @@ public class TestController {
     public ResponseEntity<TestDTO> createTest(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody TestRequest request) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         TestDTO created = testService.createTest(request, currentUser.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
@@ -64,6 +67,9 @@ public class TestController {
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody TestRequest request) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         return ResponseEntity.ok(testService.updateTest(id, request, currentUser.getId(), currentUser.getRole()));
     }
     
@@ -72,6 +78,9 @@ public class TestController {
     public ResponseEntity<Void> deleteTest(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
+        if (currentUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
         testService.deleteTest(id, currentUser.getId(), currentUser.getRole());
         return ResponseEntity.noContent().build();
     }

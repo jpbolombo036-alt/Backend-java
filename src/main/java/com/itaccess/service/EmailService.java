@@ -76,9 +76,8 @@ public class EmailService {
         } catch (Exception e) {
             // Gestion d'erreur détaillée pour le débogage
             log.error("Erreur lors de l'envoi de l'email à {}: {}", toEmail, e.getMessage(), e);
-            log.error("Type d'erreur: {}", e.getClass().getName()); // Type d'exception pour diagnostic
             // Relance une exception avec message clair pour l'appelant
-            throw new RuntimeException("Impossible d'envoyer l'email de réinitialisation: " + e.getMessage(), e);
+            throw new RuntimeException("Échec de l'envoi de l'email de réinitialisation", e);
         }
     }
     
@@ -121,8 +120,8 @@ public class EmailService {
         } catch (Exception e) {
             // Gestion d'erreur avec logging détaillé
             log.error("Erreur lors de l'envoi de l'email à {}: {}", toEmail, e.getMessage());
-            // Relance une exception avec message clair pour l'appelant
-            throw new RuntimeException("Impossible d'envoyer l'email de vérification", e);
+            // On propage l'exception originale pour ne pas perdre la cause
+            throw new RuntimeException("Échec de l'envoi de l'email de vérification", e);
         }
     }
 }

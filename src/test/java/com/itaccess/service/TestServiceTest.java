@@ -139,7 +139,7 @@ class TestServiceTest {
         // Préparer les mocks pour la logique de création
         when(applicationRepository.existsById(5L)).thenReturn(true);
         when(testSessionRepository.existsById(10L)).thenReturn(true);
-        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList()); // Liste vide -> premier test = 1
+        when(testRepository.findMaxTestNumberBySessionId(10L)).thenReturn(Optional.empty()); // aucun test -> 1
         when(testRepository.save(any(com.itaccess.entity.TestStep.class))).thenReturn(testStep);
 
         TestDTO result = testService.createTest(testRequest, 1L);
@@ -223,7 +223,7 @@ class TestServiceTest {
 
     @Test
     void getNextTestNumberForSession_returnsOne_whenNoExistingTests() {
-        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList());
+        when(testRepository.findMaxTestNumberBySessionId(10L)).thenReturn(Optional.empty());
 
         Long result = testService.getNextTestNumberForSession(10L);
 
@@ -232,13 +232,7 @@ class TestServiceTest {
 
     @Test
     void getNextTestNumberForSession_returnsNextNumber_whenExistingTests() {
-        com.itaccess.entity.TestStep test1 = new com.itaccess.entity.TestStep();
-        test1.setTestNumber(1L);
-        test1.setSessionId(10L);
-        com.itaccess.entity.TestStep test2 = new com.itaccess.entity.TestStep();
-        test2.setTestNumber(3L);
-        test2.setSessionId(10L);
-        when(testRepository.findBySessionId(10L)).thenReturn(Arrays.asList(test1, test2));
+        when(testRepository.findMaxTestNumberBySessionId(10L)).thenReturn(Optional.of(3L));
 
         Long result = testService.getNextTestNumberForSession(10L);
 

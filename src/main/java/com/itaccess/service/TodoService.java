@@ -5,12 +5,16 @@ import com.itaccess.dto.TodoRequest;
 import com.itaccess.dto.UserWithTodosDTO;
 import com.itaccess.entity.Todo;
 import com.itaccess.entity.User;
+import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.TodoRepository;
 import com.itaccess.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.format.DateTimeFormatter;
+import java.util.Collections;
+import java.util.Map;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +24,8 @@ public class TodoService {
     
     private final TodoRepository todoRepository;
     private final UserRepository userRepository;
+
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
     
     public List<TodoDTO> getAll() {
         return todoRepository.findAll()
@@ -37,7 +43,7 @@ public class TodoService {
     
     public TodoDTO getById(Long id) {
         Todo todo = todoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Todo not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Tâche non trouvée avec l'ID: " + id));
         return toDTO(todo);
     }
     
@@ -58,7 +64,7 @@ public class TodoService {
     @Transactional
     public TodoDTO update(Long id, TodoRequest request, Long userId, String userRole) {
         Todo todo = todoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Todo not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Tâche non trouvée avec l'ID: " + id));
         
         if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
             throw new SecurityException("Non autorisé à modifier cette tâche");
@@ -86,7 +92,7 @@ public class TodoService {
     @Transactional
     public void delete(Long id, Long userId, String userRole) {
         Todo todo = todoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Todo not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Tâche non trouvée avec l'ID: " + id));
 
         if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
             throw new SecurityException("Non autorisé à supprimer cette tâche");
@@ -97,7 +103,7 @@ public class TodoService {
     @Transactional
     public TodoDTO toggleComplete(Long id, Long userId, String userRole) {
         Todo todo = todoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Todo not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Tâche non trouvée avec l'ID: " + id));
         
         if (!"admin".equals(userRole) && !todo.getCreatedBy().equals(userId)) {
             throw new SecurityException("Non autorisé à modifier cette tâche");
@@ -109,26 +115,29 @@ public class TodoService {
     
     public List<UserWithTodosDTO> getUsersWithTodos() {
         List<Long> userIds = todoRepository.findDistinctCreatedBy();
+        if (userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         List<User> users = userRepository.findByIdIn(userIds);
         
+        // Optimize: Fetch all todos in one query and group them by user ID in memory
+        List<Todo> allTodos = todoRepository.findByCreatedByInOrderByCreatedAtDesc(userIds);
+        Map<Long, List<TodoDTO>> todosByUserId = allTodos.stream()
+                .map(this::toDTO)
+                .collect(Collectors.groupingBy(TodoDTO::getCreatedBy));
+
         return users.stream()
-                .map(user -> {
-                    List<TodoDTO> userTodos = todoRepository.findByCreatedByOrderByCreatedAtDesc(user.getId())
-                            .stream()
-                            .map(this::toDTO)
-                            .collect(Collectors.toList());
-                    
-                    return UserWithTodosDTO.builder()
-                            .id(user.getId())
-                            .username(user.getUsername())
-                            .email(user.getEmail())
-                            .role(user.getRole())
-                            .isActive(user.getIsActive())
-                            .profilePhoto(user.getProfilePhoto())
-                            .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)
-                            .todos(userTodos)
-                            .build();
-                })
+                .map(user -> UserWithTodosDTO.builder()
+                        .id(user.getId())
+                        .username(user.getUsername())
+                        .email(user.getEmail())
+                        .role(user.getRole())
+                        .isActive(user.getIsActive())
+                        .profilePhoto(user.getProfilePhoto())
+                        .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)
+                        .todos(todosByUserId.getOrDefault(user.getId(), Collections.emptyList()))
+                        .build())
                 .collect(Collectors.toList());
     }
     

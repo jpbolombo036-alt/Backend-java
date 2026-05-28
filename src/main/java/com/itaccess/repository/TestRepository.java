@@ -13,6 +13,8 @@ public interface TestRepository extends JpaRepository<TestStep, Long> {
     
     List<TestStep> findBySessionId(Long sessionId);
 
+    List<TestStep> findBySessionIdIn(List<Long> sessionIds);
+
     @Query("SELECT MAX(t.testNumber) FROM TestStep t WHERE t.sessionId = :sessionId")
     Optional<Long> findMaxTestNumberBySessionId(Long sessionId);
     

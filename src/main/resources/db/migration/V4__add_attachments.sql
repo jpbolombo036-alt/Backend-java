@@ -11,5 +11,5 @@ CREATE TABLE IF NOT EXISTS attachments (
     created_at TIMESTAMP,
     created_by BIGINT,
     FOREIGN KEY (bug_id) REFERENCES bugs(id),
-    FOREIGN KEY (test_step_id) REFERENCES test_steps(id)
+    FOREIGN KEY (test_step_id) REFERENCES tests(id)
 );

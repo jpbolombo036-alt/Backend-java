@@ -13,6 +13,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +23,8 @@ public class ApplicationService {
     
     private final ApplicationRepository applicationRepository;
     
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
     public PageResponse<ApplicationDTO> getAllApplications(int page, int size, String sortBy, String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
@@ -91,7 +94,7 @@ public class ApplicationService {
                 .description(application.getDescription())
                 .version(application.getVersion())
                 .environnement(application.getEnvironnement())
-                .dateCreation(application.getDateCreation() != null ? application.getDateCreation().toString() : null)
+                .dateCreation(application.getDateCreation() != null ? application.getDateCreation().format(DATE_FORMATTER) : null)
                 .createdBy(application.getCreatedBy())
                 .build();
     }

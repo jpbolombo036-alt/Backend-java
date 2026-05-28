@@ -2,6 +2,7 @@ package com.itaccess.service;
 
 import com.itaccess.entity.TestCase;
 import com.itaccess.entity.TestStep;
+import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.TestCaseRepository;
 import com.itaccess.repository.TestRepository;
 import lombok.RequiredArgsConstructor;
@@ -25,7 +26,7 @@ public class TestCaseService {
     @Transactional
     public void instantiateTestCaseInSession(Long testCaseId, Long sessionId, Long createdBy) {
         TestCase testCase = testCaseRepository.findById(testCaseId)
-                .orElseThrow(() -> new RuntimeException("Scénario non trouvé"));
+                .orElseThrow(() -> new ResourceNotFoundException("Scénario non trouvé avec l'ID: " + testCaseId));
 
         // Pour chaque étape définie dans le scénario, on crée une ligne d'exécution
         List<TestStep> stepsToExecute = testCase.getSteps().stream()

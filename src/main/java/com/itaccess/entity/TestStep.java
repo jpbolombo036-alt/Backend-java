@@ -5,7 +5,7 @@ import lombok.*; // Utilisez le même package lombok pour la nouvelle entité
 import java.util.List;
 
 @Entity
-@Table(name = "test_steps") // Renommer la table en 'test_steps'
+@Table(name = "tests")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

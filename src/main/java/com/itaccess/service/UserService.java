@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -24,6 +25,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
     public PageResponse<UserDTO> getAllUsers(int page, int size, String sortBy, String sortDir) {
         Sort sort = sortDir.equalsIgnoreCase("desc") ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
@@ -37,8 +40,7 @@ public class UserService {
     }
     
     public List<UserDTO> getAvailableUsers(Long currentUserId) {
-        return userRepository.findAll().stream()
-                .filter(user -> !user.getId().equals(currentUserId))
+        return userRepository.findByIdNot(currentUserId).stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -89,6 +91,10 @@ public class UserService {
             user.setRole(dto.getRole());
         }
         
+        if (dto.getLastPhoneVersion() != null) {
+            user.setLastPhoneVersion(dto.getLastPhoneVersion());
+        }
+
         if (dto.getIsActive() != null) {
             user.setIsActive(dto.getIsActive());
         }
@@ -160,6 +166,7 @@ public class UserService {
                 .role(user.getRole())
                 .isActive(user.getIsActive())
                 .profilePhoto(user.getProfilePhoto())
+                .lastPhoneVersion(user.getLastPhoneVersion())
                 .createdAt(user.getCreatedAt() != null ? user.getCreatedAt().toString() : null)
                 .build();
     }

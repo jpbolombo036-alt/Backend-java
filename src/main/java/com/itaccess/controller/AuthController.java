@@ -131,6 +131,9 @@ import org.springframework.web.bind.annotation.*;
        */
       public ResponseEntity<CurrentUserResponse> getCurrentUser() {
           Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+          if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getPrincipal())) {
+              return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+          }
           String username = authentication.getName();
           User user = userRepository.findByUsername(username)
                   .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
@@ -252,6 +255,6 @@ import org.springframework.web.bind.annotation.*;
      
      private boolean hasAdminRole(Authentication authentication) {
          return authentication.getAuthorities().stream()
-                 .anyMatch(auth -> "admin".equals(auth.getAuthority()));
+                 .anyMatch(auth -> "ROLE_admin".equals(auth.getAuthority()) || "ROLE_ADMIN".equals(auth.getAuthority()));
      }
  }

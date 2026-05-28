@@ -27,6 +27,8 @@ public class UserDTO {
     
     private String profilePhoto;
     
+    private String lastPhoneVersion;
+    
     private String createdAt;
     
     private String password;
