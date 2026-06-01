@@ -2,6 +2,7 @@ package com.itaccess.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -25,6 +26,18 @@ public class JwtTokenProvider {
     @Value("${app.jwt.expiration}")
     private long jwtExpiration;
     
+    @PostConstruct
+    public void validateSecret() {
+        if (jwtSecret == null || jwtSecret.trim().isEmpty()) {
+            throw new IllegalStateException("JWT secret is not configured. Set app.jwt.secret or JWT_SECRET to a secure value.");
+        }
+
+        int secretLength = jwtSecret.getBytes(StandardCharsets.UTF_8).length;
+        if (secretLength < 32) {
+            throw new IllegalStateException("JWT secret must be at least 256 bits (32 bytes). Current secret length: " + secretLength + " bytes.");
+        }
+    }
+
     public String generateToken(Authentication authentication) {
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
         
