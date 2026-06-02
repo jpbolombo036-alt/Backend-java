@@ -81,6 +81,21 @@ class AuthControllerIntegrationTest {
                 .andExpect(jsonPath("$.accessToken").value("test-jwt-token"))
                 .andExpect(jsonPath("$.tokenType").value("bearer"));
     }
+
+    @Test
+    void login_ShouldReturnToken_WhenValidFormUrlEncodedCredentials() throws Exception {
+        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(authentication);
+        when(userRepository.findByUsername("testuser")).thenReturn(java.util.Optional.of(testUser));
+        when(jwtTokenProvider.generateToken(authentication)).thenReturn("test-jwt-token");
+
+        mockMvc.perform(post("/auth/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .content("username=testuser&password=password123"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accessToken").value("test-jwt-token"))
+                .andExpect(jsonPath("$.tokenType").value("bearer"));
+    }
     
     @Test
     void login_ShouldReturnBadRequest_WhenMissingCredentials() throws Exception {

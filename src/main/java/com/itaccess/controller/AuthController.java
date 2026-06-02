@@ -13,7 +13,7 @@ package com.itaccess.controller;
   import lombok.extern.slf4j.Slf4j;
   import org.springframework.beans.factory.annotation.Value;
   import org.springframework.http.HttpStatus;
-  import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -38,90 +38,75 @@ import org.springframework.web.bind.annotation.*;
       @Value("${app.security.admin-init-key}")
       private String adminInitKey;
      
-     @PostMapping(value = "/token", consumes = {"application/json", "application/x-www-form-urlencoded"})
-     @Operation(summary = "Connexion", description = "Authentifie l'utilisateur et retourne un token JWT")
-     public ResponseEntity<TokenResponse> login(
-             /**
-              * Authentification sécurisée. 
-              * Supporte JSON et Form-URL-Encoded.
-              * Capture désormais phoneVersion pour le suivi QA du matériel.
-              */
-             @Valid @RequestBody(required = false) LoginRequest requestBody,
-             @RequestParam(value = "username", required = false) String username,
-             @RequestParam(value = "password", required = false) String password) {
-         
-          String user = username;
-          String pass = password;
-          String phoneVersion = null;
-          
-         if (requestBody != null) {
-             user = requestBody.getUsername();
-             pass = requestBody.getPassword();
-             phoneVersion = requestBody.getPhoneVersion();
+     @PostMapping(value = "/token", consumes = MediaType.APPLICATION_JSON_VALUE)
+     @Operation(summary = "Connexion JSON", description = "Authentifie l'utilisateur avec un JSON et retourne un token JWT")
+     public ResponseEntity<?> loginJson(@Valid @RequestBody LoginRequest requestBody) {
+         return processLogin(requestBody.getUsername(), requestBody.getPassword(), requestBody.getPhoneVersion());
+     }
+
+     @PostMapping(value = "/token", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+     @Operation(summary = "Connexion formulaire", description = "Authentifie l'utilisateur avec un formulaire URL-encoded et retourne un token JWT")
+     public ResponseEntity<?> loginForm(@Valid @ModelAttribute LoginRequest requestBody) {
+         return processLogin(requestBody.getUsername(), requestBody.getPassword(), requestBody.getPhoneVersion());
+     }
+
+     private ResponseEntity<?> processLogin(String user, String pass, String phoneVersion) {
+         if (user == null || pass == null || user.isBlank() || pass.isBlank()) {
+             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                     .body(ErrorResponse.builder()
+                             .error("Nom d'utilisateur et mot de passe requis")
+                             .build());
          }
-        
-        if (user == null || pass == null || user.isBlank() || pass.isBlank()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(TokenResponse.builder()
-                            .accessToken("Nom d'utilisateur et mot de passe requis")
-                            .tokenType("bearer")
-                            .build());
-        }
-        
-        try {
+
+         try {
              Authentication authentication = authenticationManager.authenticate(
                      new UsernamePasswordAuthenticationToken(user, pass)
              );
-             
+
              SecurityContextHolder.getContext().setAuthentication(authentication);
-             
-              User existingUser = userRepository.findByUsername(user)
-                      .orElse(null);
-             
+
+             User existingUser = userRepository.findByUsername(user)
+                     .orElse(null);
+
              if (existingUser == null) {
                  return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                         .body(TokenResponse.builder()
-                                 .accessToken("Utilisateur non trouvé")
-                                 .tokenType("bearer")
-                                 .build());
-             }
-             
-             if (existingUser.getIsActive() != null && !existingUser.getIsActive()) {
-                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                         .body(TokenResponse.builder()
-                                 .accessToken("Compte désactivé. Veuillez contacter l'administrateur.")
-                                 .tokenType("bearer")
+                         .body(ErrorResponse.builder()
+                                 .error("Utilisateur non trouvé")
                                  .build());
              }
 
-             // Mise à jour de la version du téléphone si fournie
+             if (existingUser.getIsActive() != null && !existingUser.getIsActive()) {
+                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                         .body(ErrorResponse.builder()
+                                 .error("Compte désactivé. Veuillez contacter l'administrateur.")
+                                 .build());
+             }
+
              if (phoneVersion != null) {
                  existingUser.setLastPhoneVersion(phoneVersion);
                  userRepository.save(existingUser);
              }
-             
-             String token = jwtTokenProvider.generateToken(authentication);
-             
+
+             String token = jwtTokenProvider.generateToken(existingUser);
+
              return ResponseEntity.ok(TokenResponse.builder()
                      .accessToken(token)
                      .tokenType("bearer")
                      .build());
-             
-          } catch (AuthenticationException e) {
-              log.warn("Échec d'authentification pour l'utilisateur: {}", user, e);
-              return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                      .body(TokenResponse.builder()
-                              .accessToken("Nom d'utilisateur ou mot de passe incorrect")
-                              .tokenType("bearer")
-                              .build());
-          } catch (Exception e) {
-              log.error("Erreur lors de l'authentification pour l'utilisateur: {}", user, e);
-              return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                      .body(TokenResponse.builder()
-                              .accessToken("Erreur: " + e.getMessage())
-                              .tokenType("bearer")
-                              .build());
-          }
+
+         } catch (AuthenticationException e) {
+             log.warn("Échec d'authentification pour l'utilisateur: {}", user, e);
+             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                     .body(ErrorResponse.builder()
+                             .error("Nom d'utilisateur ou mot de passe incorrect")
+                             .build());
+         } catch (Exception e) {
+             log.error("Erreur lors de l'authentification pour l'utilisateur: {}", user, e);
+             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                     .body(ErrorResponse.builder()
+                             .error("Erreur serveur lors de la tentative de connexion")
+                             .build());
+         }
      }
      
       @GetMapping("/me")

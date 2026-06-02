@@ -4,6 +4,7 @@ import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import com.itaccess.entity.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -39,17 +40,23 @@ public class JwtTokenProvider {
     }
 
     public String generateToken(Authentication authentication) {
-        UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-        
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserPrincipal userPrincipal) {
+            return generateToken(userPrincipal);
+        }
+        throw new IllegalArgumentException("Unsupported authentication principal type: " + principal.getClass().getName());
+    }
+
+    public String generateToken(UserPrincipal userPrincipal) {
         List<String> roles = userPrincipal.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(Collectors.toList());
-        
+
         SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-        
+
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpiration);
-        
+
         return Jwts.builder()
                 .subject(Long.toString(userPrincipal.getId()))
                 .claim("username", userPrincipal.getUsername())
@@ -58,6 +65,10 @@ public class JwtTokenProvider {
                 .expiration(expiryDate)
                 .signWith(key)
                 .compact();
+    }
+
+    public String generateToken(User user) {
+        return generateToken(UserPrincipal.create(user));
     }
     
     public Long getUserIdFromToken(String token) {
