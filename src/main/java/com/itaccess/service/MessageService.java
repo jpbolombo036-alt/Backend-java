@@ -2,10 +2,13 @@ package com.itaccess.service;
 
 import com.itaccess.dto.MessageDTO;
 import com.itaccess.dto.MessageRequest;
+import com.itaccess.dto.SystemNotificationDTO;
 import com.itaccess.entity.Message;
+import com.itaccess.entity.SystemNotification;
 import com.itaccess.entity.User;
 import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.MessageRepository;
+import com.itaccess.repository.SystemNotificationRepository;
 import com.itaccess.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +23,7 @@ public class MessageService {
     
     private final MessageRepository messageRepository;
     private final UserRepository userRepository;
+    private final SystemNotificationRepository notificationRepository;
     
     public List<MessageDTO> getAll() {
         return messageRepository.findAll()
@@ -73,7 +77,19 @@ public class MessageService {
                 .read(false)
                 .build();
         
-        return toDTO(messageRepository.save(message));
+        Message saved = messageRepository.save(message);
+        
+        SystemNotification notif = SystemNotification.builder()
+                .title("Nouveau message")
+                .message(sender.getUsername() + " vous a envoyé un message")
+                .type(SystemNotification.NotificationType.INFO)
+                .targetUserId(receiver.getId())
+                .createdBy(senderId)
+                .actionUrl("/messages")
+                .build();
+        notificationRepository.save(notif);
+        
+        return toDTO(saved);
     }
     
     @Transactional

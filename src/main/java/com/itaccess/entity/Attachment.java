@@ -41,6 +41,9 @@ public class Attachment {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    @Column(name = "message_id")
+    private Long messageId;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

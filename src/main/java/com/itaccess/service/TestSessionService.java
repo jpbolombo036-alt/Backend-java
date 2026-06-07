@@ -88,7 +88,7 @@ public class TestSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Session non trouvée avec l'ID: " + id));
         
         testRepository.deleteBySessionId(id);
-        testSessionRepository.deleteById(id);
+        testSessionRepository.delete(session);
     }
     
     private List<TestSessionDTO> toOptimizedDTOList(List<TestSession> sessions) {
