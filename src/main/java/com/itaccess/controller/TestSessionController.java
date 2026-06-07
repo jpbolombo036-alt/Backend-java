@@ -62,4 +62,10 @@ public class TestSessionController {
         testSessionService.deleteTestSession(id);
         return ResponseEntity.noContent().build();
     }
+    
+    @GetMapping("/{id}/export")
+    @Operation(summary = "Exporter la session", description = "Retourne les données de la session pour export PDF/Word")
+    public ResponseEntity<TestSessionDTO> exportTestSession(@PathVariable Long id) {
+        return ResponseEntity.ok(testSessionService.getTestSessionById(id));
+    }
 }

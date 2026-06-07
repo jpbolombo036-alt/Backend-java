@@ -10,7 +10,7 @@ import java.util.Optional;
 
 @Repository
 public interface TestRepository extends JpaRepository<TestStep, Long> {
-    
+     
     List<TestStep> findBySessionId(Long sessionId);
 
     List<TestStep> findBySessionIdIn(List<Long> sessionIds);
@@ -22,4 +22,6 @@ public interface TestRepository extends JpaRepository<TestStep, Long> {
     
     @Modifying
     void deleteBySessionId(Long sessionId);
+    
+    Long countByStatut(String statut);
 }

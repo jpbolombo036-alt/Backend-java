@@ -22,6 +22,7 @@ public class TestSessionDTO {
     private String statut;
     private Long createdBy;
     private String createdByUsername;
+    private String createdByRole;
     private List<TestDTO> tests;
     private Integer totalTests;
     private Integer testsOk;

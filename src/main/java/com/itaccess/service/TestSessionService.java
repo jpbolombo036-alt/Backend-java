@@ -102,14 +102,18 @@ public class TestSessionService {
                 .collect(Collectors.groupingBy(TestStep::getSessionId));
         Map<Long, String> appNames = applicationRepository.findAllById(appIds).stream()
                 .collect(Collectors.toMap(Application::getId, Application::getNom));
-        Map<Long, String> userNames = userRepository.findByIdIn(userIds).stream()
-                .collect(Collectors.toMap(User::getId, User::getUsername));
+        Map<Long, User> usersById = userRepository.findByIdIn(userIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
 
         return sessions.stream()
-                .map(s -> buildDTO(s, 
-                        testsBySession.getOrDefault(s.getId(), Collections.emptyList()),
-                        appNames.get(s.getApplicationId()),
-                        userNames.get(s.getCreatedBy())))
+                .map(s -> {
+                    User user = usersById.get(s.getCreatedBy());
+                    return buildDTO(s, 
+                            testsBySession.getOrDefault(s.getId(), Collections.emptyList()),
+                            appNames.get(s.getApplicationId()),
+                            user != null ? user.getUsername() : null,
+                            user != null ? user.getRole() : null);
+                })
                 .collect(Collectors.toList());
     }
 
@@ -117,13 +121,12 @@ public class TestSessionService {
         List<TestStep> tests = testRepository.findBySessionId(session.getId());
         String appName = session.getApplicationId() != null ? 
                 applicationRepository.findById(session.getApplicationId()).map(Application::getNom).orElse(null) : null;
-        String userName = session.getCreatedBy() != null ? 
-                userRepository.findById(session.getCreatedBy()).map(User::getUsername).orElse(null) : null;
+        User user = session.getCreatedBy() != null ? userRepository.findById(session.getCreatedBy()).orElse(null) : null;
         
-        return buildDTO(session, tests, appName, userName);
+        return buildDTO(session, tests, appName, user != null ? user.getUsername() : null, user != null ? user.getRole() : null);
     }
 
-    private TestSessionDTO buildDTO(TestSession session, List<TestStep> tests, String appNom, String userNom) {
+    private TestSessionDTO buildDTO(TestSession session, List<TestStep> tests, String appNom, String userNom, String userRole) {
         long testsOk = tests.stream().filter(t -> "OK".equals(t.getStatut())).count();
         long testsBug = tests.stream().filter(t -> "BUG".equals(t.getStatut())).count();
         long testsEnCours = tests.stream().filter(t -> "EN COURS".equals(t.getStatut())).count();
@@ -141,6 +144,7 @@ public class TestSessionService {
                 .statut(session.getStatut())
                 .createdBy(session.getCreatedBy())
                 .createdByUsername(userNom)
+                .createdByRole(userRole)
                 .tests(tests.stream().map(this::toTestDTO).collect(Collectors.toList()))
                 .totalTests(tests.size())
                 .testsOk((int) testsOk)
