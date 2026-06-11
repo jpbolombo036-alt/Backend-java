@@ -9,6 +9,8 @@ import com.itaccess.repository.ApkFileRepository; // Interface pour accéder à 
 import lombok.RequiredArgsConstructor;       // Annotation Lombok pour générer le constructeur
 import lombok.extern.slf4j.Slf4j;           // Annotation Lombok pour les logs
 import org.springframework.beans.factory.annotation.Value; // Pour injecter des valeurs depuis application.yml
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service; // Annotation Spring pour marquer cette classe comme un service
 import org.springframework.web.multipart.MultipartFile; // Pour gérer les fichiers uploadés
 
@@ -32,6 +34,9 @@ public class ApkService {
     // Repository pour interagir avec la table apk_files en base de données
     // 'final' car injecté par Spring et ne doit pas changer
     private final ApkFileRepository apkFileRepository;
+    
+    // Nouveau service pour la traçabilité
+    private final AuditService auditService;
     
     // Injecte la valeur depuis application.yml (clé app.upload.dir)
     // Valeur par défaut : "uploads/apk" si non définie dans le fichier de config
@@ -127,10 +132,10 @@ public class ApkService {
     /**
      * Méthode pour télécharger un fichier APK
      * @param id : identifiant du fichier à télécharger
-     * @return : tableau d'octets représentant le fichier
+     * @return : Ressource pour le téléchargement (streaming)
      * @throws IOException : si le fichier ne peut être lu
      */
-    public byte[] downloadApk(Long id) throws IOException {
+    public Resource downloadApkAsResource(Long id) throws IOException {
         // Recherche du fichier en base de données par son ID
         ApkFile apkFile = apkFileRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("APK non trouvé"));
@@ -139,13 +144,11 @@ public class ApkService {
         apkFile.setDownloadCount(apkFile.getDownloadCount() + 1); // Ajoute 1 au compteur actuel
         apkFileRepository.save(apkFile); // Sauvegarde la mise à jour en base
         
-        // Note: Pour des fichiers volumineux, préférez retourner un Resource ou un InputStream
-        // au lieu de charger tous les octets en mémoire vive.
         Path filePath = Paths.get(apkFile.getFilePath());
         if (!Files.exists(filePath)) {
             throw new ResourceNotFoundException("Fichier physique non trouvé");
         }
-        return Files.readAllBytes(filePath);
+        return new UrlResource(filePath.toUri());
     }
     
     /**
@@ -186,9 +189,10 @@ public class ApkService {
     /**
      * Supprime un fichier APK (physiquement et en base de données)
      * @param id : identifiant de l'APK à supprimer
+     * @param userId : ID de l'utilisateur effectuant la suppression
      * @throws IOException : si erreur lors de la suppression du fichier physique
      */
-    public void deleteApk(Long id) throws IOException {
+    public void deleteApk(Long id, Long userId) throws IOException {
         // Recherche l'APK à supprimer, lève une exception si non trouvé
         ApkFile apkFile = apkFileRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("APK non trouvé"));
@@ -201,7 +205,10 @@ public class ApkService {
         
         // ÉTAPE 2 : Suppression de l'entité en base de données
         apkFileRepository.delete(apkFile); // Supprime l'enregistrement de la table apk_files
-        log.info("APK deleted: {}", apkFile.getOriginalFileName()); // Log de confirmation
+        
+        // ÉTAPE 3 : Audit de l'action
+        auditService.logAction("DELETE_APK", "Fichier: " + apkFile.getOriginalFileName(), userId);
+        log.info("APK deleted: {}", apkFile.getOriginalFileName()); 
     }
     
     /**

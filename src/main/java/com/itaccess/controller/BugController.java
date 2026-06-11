@@ -8,9 +8,11 @@ import com.itaccess.exception.ResourceNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -24,6 +26,7 @@ public class BugController {
     private final BugRepository bugRepository;
 
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Déclarer un bug", description = "Crée un nouveau rapport d'anomalie lié à une étape de test")
     /**
      * Route critique : lie un bug à une étape de test spécifique (TestStep).
@@ -31,9 +34,6 @@ public class BugController {
     public ResponseEntity<Bug> createBug(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @RequestBody Bug bug) {
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         // Enregistre qui a trouvé le bug
         if (bug.getAssignedTo() == null) {
             bug.setAssignedTo(currentUser.getId());

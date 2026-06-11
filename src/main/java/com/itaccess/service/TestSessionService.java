@@ -66,10 +66,15 @@ public class TestSessionService {
     }
     
     @Transactional
-    public TestSessionDTO updateTestSession(Long id, TestSessionRequest request) {
+    public TestSessionDTO updateTestSession(Long id, TestSessionRequest request, Long userId, String userRole) {
         TestSession session = testSessionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session non trouvée avec l'ID: " + id));
         
+        // Vérification d'autorisation : seul l'admin ou le créateur de la session peut la modifier
+        if (!"admin".equals(userRole) && !session.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à modifier cette session de test");
+        }
+
         session.setNom(request.getNom());
         session.setDescription(request.getDescription());
         session.setApplicationId(request.getApplicationId());
@@ -83,9 +88,14 @@ public class TestSessionService {
     }
     
     @Transactional
-    public void deleteTestSession(Long id) {
+    public void deleteTestSession(Long id, Long userId, String userRole) {
         TestSession session = testSessionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Session non trouvée avec l'ID: " + id));
+
+        // Vérification d'autorisation : seul l'admin ou le créateur de la session peut la supprimer
+        if (!"admin".equals(userRole) && !session.getCreatedBy().equals(userId)) {
+            throw new SecurityException("Non autorisé à supprimer cette session de test");
+        }
         
         testRepository.deleteBySessionId(id);
         testSessionRepository.delete(session);

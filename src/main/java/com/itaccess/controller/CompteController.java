@@ -6,6 +6,7 @@ import com.itaccess.dto.PageResponse;
 import com.itaccess.security.CurrentUser;
 import com.itaccess.security.UserInfo;
 import com.itaccess.service.CompteService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -40,6 +41,7 @@ public class CompteController {
     }
     
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Créer un compte", description = "Crée un nouveau compte")
     public ResponseEntity<CompteDTO> createCompte(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
@@ -49,6 +51,7 @@ public class CompteController {
     }
     
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Modifier un compte", description = "Modifie un compte existant")
     public ResponseEntity<CompteDTO> updateCompte(
             @PathVariable Long id,
@@ -58,6 +61,7 @@ public class CompteController {
     }
     
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Supprimer un compte", description = "Supprime un compte")
     public ResponseEntity<Void> deleteCompte(
             @PathVariable Long id,

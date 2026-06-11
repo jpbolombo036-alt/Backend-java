@@ -8,6 +8,7 @@ import com.itaccess.service.TestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.security.access.prepost.PreAuthorize;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -47,6 +48,7 @@ public class TestController {
     }
     
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Créer un test", description = "Crée un nouveau test (authentification requise)")
     /**
      * Enregistre le résultat d'un pas de test manuel.
@@ -54,33 +56,26 @@ public class TestController {
     public ResponseEntity<TestDTO> createTest(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody TestRequest request) {
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         TestDTO created = testService.createTest(request, currentUser.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
     
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Modifier un test", description = "Modifie un test existant (authentification requise)")
     public ResponseEntity<TestDTO> updateTest(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
-            @Valid @RequestBody TestRequest request) {
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+            @Valid @RequestBody TestRequest request) {        
         return ResponseEntity.ok(testService.updateTest(id, request, currentUser.getId(), currentUser.getRole()));
     }
     
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Supprimer un test", description = "Supprime un test (authentification requise)")
     public ResponseEntity<Void> deleteTest(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         testService.deleteTest(id, currentUser.getId(), currentUser.getRole());
         return ResponseEntity.noContent().build();
     }

@@ -27,13 +27,19 @@ public class HabilitationService {
     }
     
     @Transactional
-    public HabilitationDTO createHabilitation(HabilitationDTO dto) {
+    public HabilitationDTO createHabilitation(HabilitationDTO dto, Long userId, String userRole) {
+        // Seul un admin peut créer des habilitations
+        if (!"admin".equals(userRole)) {
+            throw new SecurityException("Non autorisé à créer une habilitation");
+        }
+
         Compte compte = compteRepository.findById(dto.getCompteId())
                 .orElseThrow(() -> new ResourceNotFoundException("Compte non trouvé avec l'ID: " + dto.getCompteId()));
         
         Habilitation habilitation = Habilitation.builder()
                 .compteId(dto.getCompteId())
                 .permission(dto.getPermission())
+                .createdBy(userId) // Enregistre l'admin qui a créé l'habilitation
                 .build();
         
         Habilitation savedHabilitation = habilitationRepository.save(habilitation);
@@ -41,7 +47,12 @@ public class HabilitationService {
     }
     
     @Transactional
-    public void deleteHabilitation(Long id) {
+    public void deleteHabilitation(Long id, Long userId, String userRole) {
+        // Seul un admin peut supprimer des habilitations
+        if (!"admin".equals(userRole)) {
+            throw new SecurityException("Non autorisé à supprimer une habilitation");
+        }
+
         if (!habilitationRepository.existsById(id)) {
             throw new ResourceNotFoundException("Habilitation non trouvée avec l'ID: " + id);
         }

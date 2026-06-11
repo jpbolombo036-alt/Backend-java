@@ -5,6 +5,7 @@ import com.itaccess.dto.PageResponse;
 import com.itaccess.security.CurrentUser;
 import com.itaccess.security.UserInfo;
 import com.itaccess.service.ApplicationService;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,37 +40,31 @@ public class ApplicationController {
     }
     
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Créer une application", description = "Crée une nouvelle application")
     public ResponseEntity<ApplicationDTO> createApplication(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody ApplicationDTO dto) {
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         ApplicationDTO created = applicationService.createApplication(dto, currentUser.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
     
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Modifier une application", description = "Modifie une application existante")
     public ResponseEntity<ApplicationDTO> updateApplication(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
-            @Valid @RequestBody ApplicationDTO dto) {
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+            @Valid @RequestBody ApplicationDTO dto) {        
         return ResponseEntity.ok(applicationService.updateApplication(id, dto, currentUser.getId(), currentUser.getRole()));
     }
     
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     @Operation(summary = "Supprimer une application", description = "Supprime une application")
     public ResponseEntity<Void> deleteApplication(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
-        if (currentUser == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
         applicationService.deleteApplication(id, currentUser.getId(), currentUser.getRole());
         return ResponseEntity.noContent().build();
     }

@@ -29,7 +29,7 @@ public class DashboardController {
         long totalApplications = applicationRepository.count();
         long totalSessions = testSessionRepository.count();
         long totalTests = testRepository.count();
-        long totalUsers = userRepository.countByRole("USER");
+        long totalUsers = userRepository.count(); // Tous les utilisateurs (USER + ADMIN)
         long totalAccounts = compteRepository.count();
         long testsOk = testRepository.countByStatut("OK");
         long testsBug = testRepository.countByStatut("BUG");

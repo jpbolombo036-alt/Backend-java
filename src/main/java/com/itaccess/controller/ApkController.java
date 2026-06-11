@@ -7,6 +7,7 @@ import com.itaccess.service.ApkService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.core.io.Resource;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -60,15 +61,15 @@ public class ApkController {
     
     @GetMapping("/download/{id}")
     @Operation(summary = "Télécharger un APK", description = "Télécharge un fichier APK par son ID")
-    public ResponseEntity<byte[]> downloadApk(@PathVariable Long id) {
+    public ResponseEntity<Resource> downloadApk(@PathVariable Long id) {
         try {
-            byte[] fileContent = apkService.downloadApk(id);
+            Resource fileContent = apkService.downloadApkAsResource(id);
             ApkFileDTO apkFile = apkService.getApkById(id);
             
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/vnd.android.package-archive"));
             headers.setContentDispositionFormData("attachment", apkFile.getOriginalFileName());
-            headers.setContentLength(fileContent.length);
+            headers.setContentLength(fileContent.contentLength());
             headers.setCacheControl("no-cache, no-store, must-revalidate");
             headers.setPragma("no-cache");
             headers.setExpires(0);
@@ -105,7 +106,7 @@ public class ApkController {
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         try {
-            apkService.deleteApk(id);
+            apkService.deleteApk(id, currentUser.getId()); // Passe l'ID de l'utilisateur pour l'audit
             return ResponseEntity.noContent().build();
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
