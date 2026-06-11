@@ -25,17 +25,16 @@ public class TodoService {
     private final UserRepository userRepository;
     
     public List<TodoDTO> getAll() {
-        return todoRepository.findAll()
-                .stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOList(todoRepository.findAll());
     }
     
     public List<TodoDTO> getAllByUser(Long userId) {
-        return todoRepository.findByCreatedByOrderByCreatedAtDesc(userId)
-                .stream()
-                .map(this::toDTO)
-                .collect(Collectors.toList());
+        return toDTOList(todoRepository.findByCreatedByOrderByCreatedAtDesc(userId));
+    }
+    
+    public List<TodoDTO> getAllGroupedByUser() {
+        List<Todo> todos = todoRepository.findAll();
+        return toDTOList(todos);
     }
     
     public TodoDTO getById(Long id) {
@@ -138,7 +137,26 @@ public class TodoService {
                 .collect(Collectors.toList());
     }
     
+    private List<TodoDTO> toDTOList(List<Todo> todos) {
+        List<Long> userIds = todos.stream()
+                .map(Todo::getCreatedBy)
+                .collect(Collectors.toList());
+        Map<Long, String> usernamesById = userRepository.findByIdIn(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getUsername));
+        
+        return todos.stream()
+                .map(todo -> toDTO(todo, usernamesById.get(todo.getCreatedBy())))
+                .collect(Collectors.toList());
+    }
+    
     private TodoDTO toDTO(Todo todo) {
+        String username = todo.getCreatedBy() != null ? userRepository.findById(todo.getCreatedBy())
+                .map(User::getUsername)
+                .orElse(null) : null;
+        return toDTO(todo, username);
+    }
+    
+    private TodoDTO toDTO(Todo todo, String username) {
         return TodoDTO.builder()
                 .id(todo.getId())
                 .title(todo.getTitle())
@@ -148,6 +166,7 @@ public class TodoService {
                 .dueDate(todo.getDueDate())
                 .createdAt(todo.getCreatedAt())
                 .createdBy(todo.getCreatedBy())
+                .createdByUsername(username)
                 .build();
     }
 }

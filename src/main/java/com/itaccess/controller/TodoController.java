@@ -90,6 +90,13 @@ public class TodoController {
         return ResponseEntity.ok(todoService.toggleComplete(id, currentUser.getId(), currentUser.getRole()));
     }
     
+    @GetMapping("/grouped-by-user")
+    @PreAuthorize("hasRole('admin')")
+    @Operation(summary = "Tâches groupées par utilisateur", description = "Retourne les tâches groupées par utilisateur (admin uniquement)")
+    public ResponseEntity<List<UserWithTodosDTO>> getTasksGroupedByUser() {
+        return ResponseEntity.ok(todoService.getUsersWithTodos());
+    }
+    
     @GetMapping("/users")
     @PreAuthorize("hasRole('admin')")
     @Operation(summary = "Utilisateurs avec leurs tâches", description = "Retourne tous les utilisateurs qui ont des tâches avec leurs tâches respectives (admin uniquement)")

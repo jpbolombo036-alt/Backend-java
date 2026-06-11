@@ -17,4 +17,5 @@ public class TodoDTO {
     private String dueDate;
     private LocalDateTime createdAt;
     private Long createdBy;
+    private String createdByUsername;
 }
