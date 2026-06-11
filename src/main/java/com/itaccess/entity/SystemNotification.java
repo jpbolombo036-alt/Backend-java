@@ -39,9 +39,14 @@ public class SystemNotification {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
     
-    @Column(name = "action_url")
+@Column(name = "action_url")
     private String actionUrl;
-    
+
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+    }
+
     public enum NotificationType {
         INFO, SUCCESS, WARNING, ERROR, SYSTEM
     }

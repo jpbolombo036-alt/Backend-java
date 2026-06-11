@@ -39,7 +39,6 @@ public class HabilitationService {
         Habilitation habilitation = Habilitation.builder()
                 .compteId(dto.getCompteId())
                 .permission(dto.getPermission())
-                .createdBy(userId) // Enregistre l'admin qui a créé l'habilitation
                 .build();
         
         Habilitation savedHabilitation = habilitationRepository.save(habilitation);
