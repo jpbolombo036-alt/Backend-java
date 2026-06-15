@@ -41,7 +41,7 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
                 if (password != null) {
                     map.put("spring.datasource.password", password);
                 }
-                environment.getPropertySources().addLast(new MapPropertySource("railway-database-config", map));
+                environment.getPropertySources().addFirst(new MapPropertySource("railway-database-config", map));
             }
         } catch (URISyntaxException e) {
             throw new IllegalStateException("Impossible de parser DATABASE_URL pour Railway : " + databaseUrl, e);
