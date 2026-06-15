@@ -27,7 +27,7 @@ Passer le backend Java/Spring Boot vers Railway en gardant Render et sa configur
    - `JWT_SECRET` identique à Render si on veut garder les tokens valides
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`
    - `MAIL_FROM`
-   - `CORS_ALLOWED_ORIGINS` incluant l’URL Railway sans retirer les URLs Render/frontend existantes
+   - `CORS_ALLOWED_ORIGINS` incluant l’URL Railway et `https://it-testerkansaccess.vercel.app/` sans retirer les URLs Render/frontend existantes (ex: `http://localhost:3000,https://it-testerkansaccess.vercel.app/,https://your-railway-app.railway.app`)
    - `FRONTEND_URL`
    - `UPLOAD_DIR=/app/uploads/attachments` si les uploads doivent rester accessibles dans le conteneur
 4. Déployer sur Railway.
