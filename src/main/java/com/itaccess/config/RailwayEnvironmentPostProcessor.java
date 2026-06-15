@@ -35,6 +35,7 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             if (database != null && !database.isEmpty()) {
                 Map<String, Object> map = new HashMap<>();
                 map.put("spring.datasource.url", "jdbc:postgresql://" + host + ":" + port + "/" + database);
+                map.put("spring.datasource.driver-class-name", "org.postgresql.Driver");
                 if (username != null) {
                     map.put("spring.datasource.username", username);
                 }
