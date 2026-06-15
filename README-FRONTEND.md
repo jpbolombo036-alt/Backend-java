@@ -24,14 +24,12 @@ API_URL=http://localhost:8000/api
 
 ### **2. Configuration CORS (Backend)**
 
-Votre backend accepte déjà toutes les origines. Vérifiez dans `CorsConfig.java` :
+La configuration CORS est gérée dans `SecurityConfig.java`. Par défaut, elle autorise les origines définies par la variable d'environnement `APP_CORS_ALLOWED_ORIGINS` (ou `*` par défaut).
 
-```java
-registry.addMapping("/api/**")
-    .allowedOrigins("*")
-    .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-    .allowedHeaders("*");
-```
+**Important :** L'origine envoyée par le navigateur ne contient **pas** de slash final (ex: `https://it-testerkansaccess.vercel.app`). Assurez-vous que votre configuration backend correspond exactement à ce que le navigateur envoie.
+
+Si vous utilisez Railway, vérifiez la variable d'environnement :
+`APP_CORS_ALLOWED_ORIGINS=http://localhost:3000,https://it-testerkansaccess.vercel.app`
 
 ## 📱 Exemples par Framework
 

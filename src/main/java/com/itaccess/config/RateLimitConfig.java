@@ -30,8 +30,8 @@ public class RateLimitConfig implements Filter {
         
         String path = httpRequest.getRequestURI();
         
-        // Appliquer le rate limiting uniquement sur /auth/**
-        if (path.startsWith("/auth/")) {
+        // Appliquer le rate limiting uniquement sur /auth/** et ignorer les requêtes OPTIONS (CORS preflight)
+        if (path.startsWith("/auth/") && !"OPTIONS".equalsIgnoreCase(httpRequest.getMethod())) {
             String clientIp = getClientIp(httpRequest);
             RateLimitInfo info = rateLimitMap.computeIfAbsent(clientIp, k -> new RateLimitInfo());
             
