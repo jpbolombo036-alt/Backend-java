@@ -6,6 +6,7 @@
   "deploy": {
     "restartPolicyType": "ON_FAILURE",
     "healthcheckPath": "/api/auth/status",
-    "healthcheckTimeout": 300
+    "healthcheckTimeout": 300,
+    "serviceName": "backend"
   }
 }

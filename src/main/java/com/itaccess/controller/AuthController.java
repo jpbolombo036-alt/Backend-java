@@ -39,6 +39,13 @@ import org.springframework.web.bind.annotation.*;
       @Value("${app.security.admin-init-key}")
       private String adminInitKey;
      
+     @GetMapping("/status")
+     @Operation(summary = "État du service", description = "Endpoint public pour le healthcheck de Railway")
+     public ResponseEntity<String> getStatus() {
+         log.debug("Healthcheck call received");
+         return ResponseEntity.ok("UP");
+     }
+
      @PostMapping(value = "/token", consumes = MediaType.APPLICATION_JSON_VALUE)
      @Operation(summary = "Connexion JSON", description = "Authentifie l'utilisateur avec un JSON et retourne un token JWT")
      public ResponseEntity<?> loginJson(@Valid @RequestBody LoginRequest requestBody) {
