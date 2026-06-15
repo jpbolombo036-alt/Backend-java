@@ -174,11 +174,11 @@ class TestServiceTest {
     }
 
     @Test
-    void createTest_throwsResourceNotFoundException_whenSessionIdIsZero() {
+    void createTest_throwsIllegalArgumentException_whenSessionIdIsZero() {
         testRequest.setSessionId(0L);
+        when(applicationRepository.existsById(5L)).thenReturn(true);
         
-        assertThrows(ResourceNotFoundException.class, () -> testService.createTest(testRequest, 1L));
-        // Aucune interaction avec les repositories attendue car la validation échoue avant
+        assertThrows(IllegalArgumentException.class, () -> testService.createTest(testRequest, 1L));
     }
 
     @Test

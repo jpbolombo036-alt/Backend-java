@@ -155,6 +155,7 @@ class TestControllerIntegrationTest {
     void createTest_ShouldReturnCreated_WhenValidData() throws Exception {
         when(applicationRepository.existsById(5L)).thenReturn(true);
         when(testSessionRepository.existsById(10L)).thenReturn(true);
+        when(testRepository.findMaxTestNumberBySessionId(10L)).thenReturn(Optional.empty()); // Aucun test existant, le premier aura le numéro 1
         // Mock du save pour retourner l'entité avec un ID généré
         when(testRepository.save(any(com.itaccess.entity.TestStep.class))).thenAnswer(invocation -> {
             com.itaccess.entity.TestStep saved = invocation.getArgument(0);

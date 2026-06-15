@@ -5,6 +5,7 @@ import com.itaccess.dto.LoginRequest;
 import com.itaccess.entity.User;
 import com.itaccess.repository.UserRepository;
 import com.itaccess.security.JwtTokenProvider;
+import com.itaccess.security.UserPrincipal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,7 +73,7 @@ class AuthControllerIntegrationTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
         when(userRepository.findByUsername("testuser")).thenReturn(java.util.Optional.of(testUser));
-        when(jwtTokenProvider.generateToken(authentication)).thenReturn("test-jwt-token");
+        when(jwtTokenProvider.generateToken(any(UserPrincipal.class))).thenReturn("test-jwt-token");
         
         mockMvc.perform(post("/auth/token")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -87,7 +88,7 @@ class AuthControllerIntegrationTest {
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
                 .thenReturn(authentication);
         when(userRepository.findByUsername("testuser")).thenReturn(java.util.Optional.of(testUser));
-        when(jwtTokenProvider.generateToken(authentication)).thenReturn("test-jwt-token");
+        when(jwtTokenProvider.generateToken(any(UserPrincipal.class))).thenReturn("test-jwt-token");
 
         mockMvc.perform(post("/auth/token")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)

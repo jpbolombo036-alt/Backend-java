@@ -1,9 +1,9 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://dpg-d85fenjbc2fs73bp8d0g-a.oregon-postgres.render.com:5432/itaccess_db_z7ip}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/itaccessdb}
     driver-class-name: org.postgresql.Driver
-    username: ${SPRING_DATASOURCE_USERNAME:itaccess_db_z7ip_user}
-    password: ${SPRING_DATASOURCE_PASSWORD:C1Bn64Nx2YM46CqKu8d7OYOqUpksqDxs}
+    username: ${SPRING_DATASOURCE_USERNAME:user}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
 
   jpa:
     hibernate:
@@ -38,7 +38,7 @@ spring:
       max-request-size: 150MB
 
 server:
-  port: ${SERVER_PORT:8000}
+  port: ${SERVER_PORT:${PORT:8000}}
 
 app:
   cors:
@@ -55,12 +55,13 @@ app:
     admin-init-key: ${ADMIN_INIT_KEY:IT_ACCESS_INIT_2024_SECURE_KEY_CHANGE_ME}
 
   frontend:
-    url: ${FRONTEND_URL:https://it-testerkansa.vercel.app}
+    url: ${FRONTEND_URL:https://it-testerkansa-omega.vercel.app}
 
   upload:
     dir: ${UPLOAD_DIR:./uploads/apk}
+    attachments-dir: ${ATTACHMENTS_DIR:./uploads/attachments}
     max-file-size: ${MAX_FILE_SIZE:150MB}
 
 logging:
   level:
-    com.itaccess: ${LOG_LEVEL:DEBUG}
+    com.itaccess: ${LOG_LEVEL:INFO}

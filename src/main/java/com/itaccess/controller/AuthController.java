@@ -88,7 +88,16 @@ import org.springframework.web.bind.annotation.*;
                  userRepository.save(existingUser);
              }
 
-             String token = jwtTokenProvider.generateToken(existingUser);
+              String token = jwtTokenProvider.generateToken(
+                      new com.itaccess.security.UserPrincipal(
+                              existingUser.getId(),
+                              existingUser.getUsername(),
+                              existingUser.getHashedPassword(),
+                              existingUser.getRole(),
+                              existingUser.getIsActive() != null ? existingUser.getIsActive() : true,
+                              java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + existingUser.getRole()))
+                      )
+              );
 
              return ResponseEntity.ok(TokenResponse.builder()
                      .accessToken(token)

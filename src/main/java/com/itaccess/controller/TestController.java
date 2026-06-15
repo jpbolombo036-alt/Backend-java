@@ -20,16 +20,13 @@ import java.util.List;
 @RestController
 @RequestMapping("/tests")
 @RequiredArgsConstructor
-@Tag(name = "Tests", description = "")
+@Tag(name = "Tests", description = "Gestion des étapes de test QA")
 public class TestController {
     
     private final TestService testService;
     
     @GetMapping
-    @Operation(summary = "Liste des tests", description = "Retourne tous les tests")
-    /**
-     * Liste les étapes d'exécution. Peut être filtré par sessionId pour le dashboard.
-     */
+    @Operation(summary = "Liste des tests", description = "Récupère toutes les étapes de test, filtrables par session pour le tableau de bord")
     public ResponseEntity<List<TestDTO>> getAllTests(
             @RequestParam(required = false) Long sessionId) {
         if (sessionId != null) {
@@ -39,20 +36,14 @@ public class TestController {
     }
     
     @GetMapping("/{id}")
-    @Operation(summary = "Test par ID", description = "Retourne un test par son ID")
-    /**
-     * Récupère une étape précise avec son statut et ses commentaires.
-     */
+    @Operation(summary = "Test par ID", description = "Récupère une étape de test avec son statut et ses commentaires")
     public ResponseEntity<TestDTO> getTestById(@PathVariable Long id) {
         return ResponseEntity.ok(testService.getTestById(id));
     }
     
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Créer un test", description = "Crée un nouveau test (authentification requise)")
-    /**
-     * Enregistre le résultat d'un pas de test manuel.
-     */
+    @Operation(summary = "Créer un test", description = "Enregistre une nouvelle étape de test manuel")
     public ResponseEntity<TestDTO> createTest(
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
             @Valid @RequestBody TestRequest request) {
@@ -62,7 +53,7 @@ public class TestController {
     
     @PutMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Modifier un test", description = "Modifie un test existant (authentification requise)")
+    @Operation(summary = "Modifier un test", description = "Met à jour une étape de test existante")
     public ResponseEntity<TestDTO> updateTest(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser,

@@ -7,3 +7,7 @@ target/
 .DS_Store
 hs_err_pid*.log
 replay_pid*.log
+.env
+.env.local
+.env.*.local
+!.env.example

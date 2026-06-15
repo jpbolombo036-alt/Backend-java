@@ -2,3 +2,8 @@ target/
 *.log
 .git/
 .env
+data/
+uploads/
+.vscode/
+.idea/
+*.md
