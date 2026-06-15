@@ -25,7 +25,6 @@ import org.springframework.web.bind.annotation.*;
 
   @RestController
   @RequestMapping("/auth")
-  @CrossOrigin(origins = "*", allowedHeaders = "*")
   @RequiredArgsConstructor
   @Tag(name = "Authentication", description = "")
   @Slf4j
