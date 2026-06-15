@@ -5,16 +5,20 @@ import org.springframework.boot.env.EnvironmentPostProcessor;
 import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.MapPropertySource;
 
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor {
 
+    private static final Pattern DATABASE_URL_PATTERN =
+            Pattern.compile("^postgresql://([^:]+):([^@]+)@([^:]+):(\\d+)/(.+)$");
+
     @Override
     public void postProcessEnvironment(ConfigurableEnvironment environment, SpringApplication application) {
-        if (environment.getProperty("SPRING_DATASOURCE_URL") != null) {
+        if (environment.getProperty("spring.datasource.url") != null
+                || environment.getProperty("SPRING_DATASOURCE_URL") != null) {
             return;
         }
 
@@ -23,49 +27,23 @@ public class RailwayEnvironmentPostProcessor implements EnvironmentPostProcessor
             return;
         }
 
-        try {
-            URI uri = new URI(databaseUrl.trim());
-            String host = uri.getHost();
-            String userInfo = uri.getUserInfo();
-            if (host == null || host.isBlank()) {
-                return;
-            }
-
-            String username = null;
-            String password = null;
-            if (userInfo != null && !userInfo.isBlank()) {
-                int idx = userInfo.indexOf(':');
-                if (idx >= 0) {
-                    username = userInfo.substring(0, idx);
-                    password = userInfo.substring(idx + 1);
-                } else {
-                    username = userInfo;
-                }
-            }
-
-            int port = uri.getPort();
-            if (port <= 0) {
-                port = 5432;
-            }
-
-            String path = uri.getPath();
-            String database = (path == null || path.isBlank()) ? "railway" : (path.startsWith("/") ? path.substring(1) : path);
-            if (database.isBlank()) {
-                database = "railway";
-            }
-
-            Map<String, Object> map = new HashMap<>();
-            map.put("spring.datasource.url", "jdbc:postgresql://" + host + ":" + port + "/" + database);
-            map.put("spring.datasource.driver-class-name", "org.postgresql.Driver");
-            if (username != null) {
-                map.put("spring.datasource.username", username);
-            }
-            if (password != null) {
-                map.put("spring.datasource.password", password);
-            }
-            environment.getPropertySources().addFirst(new MapPropertySource("railway-database-config", map));
-        } catch (URISyntaxException e) {
-            throw new IllegalStateException("Impossible de parser DATABASE_URL pour Railway : " + databaseUrl, e);
+        Matcher matcher = DATABASE_URL_PATTERN.matcher(databaseUrl.trim());
+        if (!matcher.find()) {
+            throw new IllegalStateException(
+                    "Format DATABASE_URL Railway invalide : " + databaseUrl + ". Format attendu : postgresql://user:pass@host:port/db");
         }
+
+        String username = matcher.group(1);
+        String password = matcher.group(2);
+        String host = matcher.group(3);
+        int port = Integer.parseInt(matcher.group(4));
+        String database = matcher.group(5);
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("spring.datasource.url", "jdbc:postgresql://" + host + ":" + port + "/" + database);
+        map.put("spring.datasource.driver-class-name", "org.postgresql.Driver");
+        map.put("spring.datasource.username", username);
+        map.put("spring.datasource.password", password);
+        environment.getPropertySources().addFirst(new MapPropertySource("railway-database-config", map));
     }
 }
