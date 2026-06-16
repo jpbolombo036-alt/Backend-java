@@ -4,6 +4,7 @@ import com.itaccess.dto.TestDTO;
 import com.itaccess.dto.TestSessionDTO;
 import com.itaccess.dto.TestSessionRequest;
 import com.itaccess.entity.Application;
+import com.itaccess.entity.SystemNotification;
 import com.itaccess.entity.TestStep;
 import com.itaccess.entity.TestSession;
 import com.itaccess.entity.User;
@@ -27,10 +28,12 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class TestSessionService {
 
+    private final SystemNotificationService systemNotificationService;
+    private final UserRepository userRepository;
+    
     private final TestSessionRepository testSessionRepository;
     private final TestRepository testRepository;
     private final ApplicationRepository applicationRepository;
-    private final UserRepository userRepository;
     
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
@@ -99,6 +102,34 @@ public class TestSessionService {
         
         testRepository.deleteBySessionId(id);
         testSessionRepository.delete(session);
+    }
+    
+    @Transactional
+    public TestSessionDTO requestCloseSession(Long id, Long userId) {
+        TestSession session = testSessionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Session non trouvée avec l'ID: " + id));
+        
+        if ("CLOSED".equals(session.getStatut())) {
+            throw new IllegalStateException("Cette session est déjà cloturée");
+        }
+        
+        session.setStatut("CLOSED");
+        TestSession closedSession = testSessionRepository.save(session);
+        
+        User requester = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé avec l'ID: " + userId));
+        
+        String message = "La session '" + closedSession.getNom() + "' a été cloturée par " + requester.getUsername();
+        
+        systemNotificationService.createGlobalNotification(
+                "Session de test cloturée",
+                message,
+                SystemNotification.NotificationType.INFO,
+                userId,
+                null
+        );
+        
+        return toDTOWithStats(closedSession);
     }
     
     private List<TestSessionDTO> toOptimizedDTOList(List<TestSession> sessions) {

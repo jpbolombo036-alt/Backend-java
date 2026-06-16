@@ -78,4 +78,13 @@ public class TestSessionController {
     public ResponseEntity<TestSessionDTO> exportTestSession(@PathVariable Long id) {
         return ResponseEntity.ok(testSessionService.getTestSessionById(id));
     }
+    
+    @PostMapping("/{id}/request-close")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Demander cloture session", description = "Ferme une session de test et notifie tous les admins")
+    public ResponseEntity<TestSessionDTO> requestCloseSession(
+            @PathVariable Long id,
+            @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
+        return ResponseEntity.ok(testSessionService.requestCloseSession(id, currentUser.getId()));
+    }
 }
