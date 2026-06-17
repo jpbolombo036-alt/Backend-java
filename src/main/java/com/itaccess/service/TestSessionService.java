@@ -60,7 +60,7 @@ public class TestSessionService {
                 .environnement(request.getEnvironnement())
                 .version(request.getVersion())
                 .nomDocument(request.getNomDocument())
-                .statut(request.getStatut() != null ? request.getStatut() : "En cours")
+                .statut(request.getStatut() != null ? request.getStatut() : "OPEN")
                 .createdBy(createdBy)
                 .build();
         
@@ -121,13 +121,17 @@ public class TestSessionService {
         
         String message = "La session '" + closedSession.getNom() + "' a été cloturée par " + requester.getUsername();
         
-        systemNotificationService.createGlobalNotification(
-                "Session de test cloturée",
-                message,
-                SystemNotification.NotificationType.INFO,
-                userId,
-                null
-        );
+        List<User> admins = userRepository.findByRole("admin");
+        for (User admin : admins) {
+            systemNotificationService.createNotification(
+                    "Session de test cloturée",
+                    message,
+                    SystemNotification.NotificationType.INFO,
+                    admin.getId(),
+                    userId,
+                    null
+            );
+        }
         
         return toDTOWithStats(closedSession);
     }

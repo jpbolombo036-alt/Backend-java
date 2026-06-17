@@ -56,7 +56,7 @@ public class TestSession {
     protected void onCreate() {
         dateCreation = LocalDateTime.now();
         if (statut == null) {
-            statut = "En cours";
+            statut = "OPEN";
         }
     }
 }

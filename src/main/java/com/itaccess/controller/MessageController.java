@@ -2,6 +2,7 @@ package com.itaccess.controller;
 
 import com.itaccess.dto.MessageDTO;
 import com.itaccess.dto.MessageRequest;
+import com.itaccess.dto.UnreadConversationDTO;
 import com.itaccess.security.CurrentUser;
 import com.itaccess.security.UserInfo;
 import com.itaccess.service.MessageService;
@@ -68,6 +69,20 @@ public class MessageController {
     @Operation(summary = "Messages non lus par utilisateur", description = "Retourne le nombre de messages non lus groupés par expéditeur")
     public ResponseEntity<java.util.Map<Long, Long>> getUnreadByUser(@Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         return ResponseEntity.ok(messageService.getUnreadByUser(currentUser.getId()));
+    }
+    
+    @GetMapping("/unread-conversations")
+    @Operation(summary = "Conversations non lues", description = "Retourne les conversations avec des messages non lus pour l'utilisateur actuel")
+    public ResponseEntity<List<UnreadConversationDTO>> getUnreadConversations(@Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
+        return ResponseEntity.ok(messageService.getUnreadConversations(currentUser.getId()));
+    }
+    
+    @PatchMapping("/conversation/{userId}/read")
+    @Operation(summary = "Marquer conversation comme lue", description = "Marque tous les messages d'une conversation comme lus")
+    public ResponseEntity<List<MessageDTO>> markConversationAsRead(
+            @PathVariable Long userId,
+            @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
+        return ResponseEntity.ok(messageService.markConversationAsRead(currentUser.getId(), userId));
     }
     
     @DeleteMapping("/{id}")

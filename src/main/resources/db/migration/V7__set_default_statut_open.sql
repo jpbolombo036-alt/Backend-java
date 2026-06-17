@@ -1,0 +1,1 @@
+ALTER TABLE test_sessions ALTER COLUMN statut SET DEFAULT 'OPEN';

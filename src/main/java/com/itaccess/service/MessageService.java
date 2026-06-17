@@ -3,6 +3,7 @@ package com.itaccess.service;
 import com.itaccess.dto.MessageDTO;
 import com.itaccess.dto.MessageRequest;
 import com.itaccess.dto.SystemNotificationDTO;
+import com.itaccess.dto.UnreadConversationDTO;
 import com.itaccess.entity.Message;
 import com.itaccess.entity.SystemNotification;
 import com.itaccess.entity.User;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -52,13 +54,44 @@ public class MessageService {
         return messageRepository.countByReceiverIdAndReadFalse(userId);
     }
     
-    public java.util.Map<Long, Long> getUnreadByUser(Long userId) {
+    public Map<Long, Long> getUnreadByUser(Long userId) {
         List<Message> unreadMessages = messageRepository.findByReceiverIdAndReadFalse(userId);
         return unreadMessages.stream()
-                .collect(java.util.stream.Collectors.groupingBy(
+                .collect(Collectors.groupingBy(
                     Message::getSenderId,
-                    java.util.stream.Collectors.counting()
+                    Collectors.counting()
                 ));
+    }
+    
+    public List<UnreadConversationDTO> getUnreadConversations(Long userId) {
+        List<Message> unreadMessages = messageRepository.findByReceiverIdAndReadFalse(userId);
+        return unreadMessages.stream()
+                .collect(Collectors.groupingBy(Message::getSenderId))
+                .entrySet()
+                .stream()
+                .map(entry -> {
+                    Long senderId = entry.getKey();
+                    List<Message> messages = entry.getValue();
+                    messages.sort((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()));
+                    Message last = messages.get(0);
+                    User sender = userRepository.findById(senderId).orElse(null);
+                    String username = sender != null ? sender.getUsername() : "Unknown";
+                    return UnreadConversationDTO.builder()
+                            .userId(senderId)
+                            .username(username)
+                            .unreadCount((long) messages.size())
+                            .lastMessage(toDTO(last))
+                            .build();
+                })
+                .toList();
+    }
+    
+    @Transactional
+    public List<MessageDTO> markConversationAsRead(Long userId, Long otherUserId) {
+        List<Message> unreadMessages = messageRepository.findByReceiverIdAndSenderIdAndReadFalse(userId, otherUserId);
+        unreadMessages.forEach(m -> m.setRead(true));
+        messageRepository.saveAll(unreadMessages);
+        return unreadMessages.stream().map(this::toDTO).collect(Collectors.toList());
     }
     
     @Transactional
