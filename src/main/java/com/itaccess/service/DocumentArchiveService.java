@@ -64,19 +64,8 @@ public class DocumentArchiveService {
             throw new IOException("Format de fichier non supporté. Seuls PDF et Word (.doc, .docx) sont autorisés.");
         }
 
-        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-        if (!Files.exists(uploadPath)) {
-            try {
-                Files.createDirectories(uploadPath);
-            } catch (IOException e) {
-                log.error("Failed to create upload directory: {}", e.getMessage(), e);
-                throw new IOException("Impossible de créer le répertoire d'upload: " + e.getMessage());
-            }
-        }
-
-        if (!Files.isWritable(uploadPath)) {
-            throw new IOException("Le répertoire d'upload n'est pas accessible en écriture: " + uploadPath);
-        }
+        Path uploadPath = resolveWritableUploadDirectory();
+        log.info("Upload directory resolved to: {}", uploadPath);
 
         String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
         String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
@@ -170,6 +159,30 @@ public class DocumentArchiveService {
 
         auditService.logAction("DELETE_DOCUMENT", "Document: " + document.getOriginalFileName(), userId);
         log.info("Document deleted: {}", document.getOriginalFileName());
+    }
+
+    private Path resolveWritableUploadDirectory() throws IOException {
+        Path configuredPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+        try {
+            if (!Files.exists(configuredPath)) {
+                Files.createDirectories(configuredPath);
+            }
+            if (Files.isWritable(configuredPath)) {
+                return configuredPath;
+            }
+            log.warn("Configured upload directory is not writable, falling back to /tmp: {}", configuredPath);
+        } catch (IOException e) {
+            log.warn("Failed to use configured upload directory [{}], falling back to /tmp: {}", configuredPath, e.getMessage());
+        }
+
+        Path fallbackPath = Paths.get(System.getProperty("java.io.tmpdir"), "uploads", "documents").toAbsolutePath().normalize();
+        if (!Files.exists(fallbackPath)) {
+            Files.createDirectories(fallbackPath);
+        }
+        if (!Files.isWritable(fallbackPath)) {
+            throw new IOException("Aucun répertoire d'upload accessible en écriture. Vérifié: " + configuredPath + " et " + fallbackPath);
+        }
+        return fallbackPath;
     }
 
     private boolean isSupportedContentType(String contentType) {

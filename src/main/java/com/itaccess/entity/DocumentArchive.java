@@ -56,6 +56,7 @@ public class DocumentArchive {
     private LocalDateTime uploadDate;
 
     @Column(name = "download_count")
+    @Builder.Default
     private Integer downloadCount = 0;
 
     @PrePersist

@@ -4,6 +4,7 @@ import com.itaccess.entity.Attachment;
 import com.itaccess.repository.AttachmentRepository;
 import com.itaccess.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -14,6 +15,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AttachmentService {
 
     private final AttachmentRepository attachmentRepository;
@@ -26,16 +28,12 @@ public class AttachmentService {
             throw new IOException("Impossible de stocker un fichier vide.");
         }
 
-        Path root = Paths.get(uploadDir);
-        if (!Files.exists(root)) {
-            Files.createDirectories(root);
-        }
-
         String originalFileName = StringUtils.cleanPath(file.getOriginalFilename());
         if (originalFileName.contains("..")) {
             throw new IOException("Nom de fichier invalide (tentative de traversée de répertoire) : " + originalFileName);
         }
 
+        Path root = resolveWritableUploadDirectory();
         String fileName = UUID.randomUUID().toString() + "_" + originalFileName;
         Path targetPath = root.resolve(fileName);
 
@@ -53,6 +51,30 @@ public class AttachmentService {
                 .build();
 
         return attachmentRepository.save(attachment);
+    }
+
+    private Path resolveWritableUploadDirectory() throws IOException {
+        Path configuredPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+        try {
+            if (!Files.exists(configuredPath)) {
+                Files.createDirectories(configuredPath);
+            }
+            if (Files.isWritable(configuredPath)) {
+                return configuredPath;
+            }
+            log.warn("Configured attachments directory is not writable, falling back to /tmp: {}", configuredPath);
+        } catch (IOException e) {
+            log.warn("Failed to use configured attachments directory [{}], falling back to /tmp: {}", configuredPath, e.getMessage());
+        }
+
+        Path fallbackPath = Paths.get(System.getProperty("java.io.tmpdir"), "uploads", "attachments").toAbsolutePath().normalize();
+        if (!Files.exists(fallbackPath)) {
+            Files.createDirectories(fallbackPath);
+        }
+        if (!Files.isWritable(fallbackPath)) {
+            throw new IOException("Aucun répertoire d'upload accessible en écriture. Vérifié: " + configuredPath + " et " + fallbackPath);
+        }
+        return fallbackPath;
     }
 
     public byte[] downloadAttachment(Long id) throws IOException {

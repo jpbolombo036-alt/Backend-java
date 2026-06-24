@@ -58,51 +58,26 @@ public class ApkService {
                                   String version, String packageName, String description) throws IOException {
         // Log d'information pour tracer le début de l'upload
         log.info("Starting APK upload: file={}, size={}, user={}", file.getOriginalFilename(), file.getSize(), uploadedBy);
-        
-        // ÉTAPE 1 : Préparation du répertoire d'upload
-        // Crée un objet Path à partir du chemin configuré, le rend absolu et normalisé
-        Path uploadPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-        log.info("Upload directory: {}", uploadPath); // Log pour debug du chemin utilisé
-        
-        // ÉTAPE 2 : Vérification et création du répertoire si nécessaire
-        if (!Files.exists(uploadPath)) { // Si le répertoire n'existe pas encore
-            log.info("Directory does not exist, creating: {}", uploadPath);
-            try {
-                Files.createDirectories(uploadPath); // Crée le répertoire et tous les parents nécessaires
-                log.info("Directory created successfully"); // Confirmation de création
-            } catch (IOException e) {
-                log.error("Failed to create upload directory: {}", e.getMessage(), e);
-                throw new IOException("Impossible de créer le répertoire d'upload: " + e.getMessage());
-            }
+
+        if (file.isEmpty()) {
+            throw new IOException("Le fichier ne peut pas être vide");
         }
-        
-        // ÉTAPE 3 : Vérification des permissions d'écriture du répertoire
-        if (!Files.isWritable(uploadPath)) { // Vérifie si on peut écrire dans ce répertoire
-            log.error("Upload directory is not writable: {}", uploadPath);
-            throw new IOException("Le répertoire d'upload n'est pas accessible en écriture: " + uploadPath);
-        }
-        
-        // ÉTAPE 4 : Génération d'un nom de fichier unique pour éviter les conflits
-        String originalFileName = file.getOriginalFilename(); // Récupère le nom original du fichier
+
+        String originalFileName = file.getOriginalFilename();
         if (originalFileName == null || originalFileName.isEmpty()) {
-            throw new IOException("Nom de fichier invalide"); // Validation du nom de fichier
+            throw new IOException("Nom de fichier invalide");
         }
-        
-        // Extraction de l'extension du fichier original (ex: ".apk")
+
         String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
-        // Génération d'un nom unique avec UUID + extension originale
         String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
-        // Construction du chemin complet du fichier dans le répertoire d'upload
+
+        Path uploadPath = resolveWritableUploadDirectory();
         Path filePath = uploadPath.resolve(uniqueFileName);
-        
-        // Log pour tracer où le fichier sera sauvegardé
+
         log.info("Saving file to: {}", filePath.toAbsolutePath());
-        
-        // ÉTAPE 5 : Sauvegarde physique du fichier sur le disque
         try {
-            // Copie le flux d'entrée du fichier uploadé vers le chemin de destination
             Files.copy(file.getInputStream(), filePath);
-            log.info("File saved successfully"); // Confirmation de sauvegarde
+            log.info("File saved successfully");
         } catch (IOException e) {
             log.error("Failed to save file: {}", e.getMessage(), e);
             throw new IOException("Impossible de sauvegarder le fichier: " + e.getMessage());
@@ -211,6 +186,30 @@ public class ApkService {
         log.info("APK deleted: {}", apkFile.getOriginalFileName()); 
     }
     
+    private Path resolveWritableUploadDirectory() throws IOException {
+        Path configuredPath = Paths.get(uploadDir).toAbsolutePath().normalize();
+        try {
+            if (!Files.exists(configuredPath)) {
+                Files.createDirectories(configuredPath);
+            }
+            if (Files.isWritable(configuredPath)) {
+                return configuredPath;
+            }
+            log.warn("Configured upload directory is not writable, falling back to /tmp: {}", configuredPath);
+        } catch (IOException e) {
+            log.warn("Failed to use configured upload directory [{}], falling back to /tmp: {}", configuredPath, e.getMessage());
+        }
+
+        Path fallbackPath = Paths.get(System.getProperty("java.io.tmpdir"), "uploads", "apk").toAbsolutePath().normalize();
+        if (!Files.exists(fallbackPath)) {
+            Files.createDirectories(fallbackPath);
+        }
+        if (!Files.isWritable(fallbackPath)) {
+            throw new IOException("Aucun répertoire d'upload accessible en écriture. Vérifié: " + configuredPath + " et " + fallbackPath);
+        }
+        return fallbackPath;
+    }
+
     /**
      * Méthode utilitaire privée pour convertir une entité ApkFile en DTO
      * @param apkFile : entité à convertir

@@ -8,3 +8,9 @@ restartPolicyMaxRetries = 10
 healthcheckPath = "/health"
 healthcheckTimeout = 180
 healthcheckInterval = 10
+
+# Railway Volume: persistent storage for uploaded files
+# Create this volume in the Railway dashboard:
+#   1. Go to your service → Settings → Volumes
+#   2. Add a volume with mount path: /tmp/uploads
+# This ensures PDF/Word/APK attachments survive container restarts.
