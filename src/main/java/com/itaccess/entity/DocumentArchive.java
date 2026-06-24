@@ -22,7 +22,7 @@ public class DocumentArchive {
     @Column(nullable = false, length = 255)
     private String originalFileName;
 
-    @Column(nullable = false, length = 500)
+    @Column(columnDefinition = "TEXT")
     private String filePath;
 
     @Column(nullable = false)

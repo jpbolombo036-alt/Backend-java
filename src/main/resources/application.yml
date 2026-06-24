@@ -63,6 +63,16 @@ app:
     document-archive-dir: ${DOCUMENT_ARCHIVE_DIR:/tmp/uploads/documents}
     max-file-size: ${MAX_FILE_SIZE:150MB}
 
+  storage:
+    b2:
+      enabled: ${B2_ENABLED:false}
+      key-id: ${B2_KEY_ID:}
+      application-key: ${B2_APPLICATION_KEY:}
+      bucket: ${B2_BUCKET:taccess-storage}
+      endpoint: ${B2_ENDPOINT:https://s3.us-east-005.backblazeb2.com}
+      region: ${B2_REGION:us-east-005}
+      documents-prefix: ${B2_DOCUMENTS_PREFIX:document-archive/}
+
 logging:
   level:
     com.itaccess: ${LOG_LEVEL:INFO}

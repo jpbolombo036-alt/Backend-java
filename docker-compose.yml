@@ -25,5 +25,14 @@ services:
       - SPRING_DATASOURCE_PASSWORD=password
       - JWT_SECRET=votre_secret_tres_long_et_securise_ici
       - UPLOAD_DIR=/app/uploads/attachments
+      # Backblaze B2 Storage (DocumentArchive) - laisser desactive en local par defaut
+      - B2_ENABLED=false
+      - B2_KEY_ID=your-b2-key-id
+      - B2_APPLICATION_KEY=your-b2-application-key
+      - B2_BUCKET=taccess-storage
+      - B2_ENDPOINT=https://s3.us-east-005.backblazeb2.com
     volumes:
       - ./uploads:/app/uploads
+
+volumes:
+  uploads:

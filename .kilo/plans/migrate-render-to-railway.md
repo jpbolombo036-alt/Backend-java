@@ -42,6 +42,21 @@ Passer le backend Java/Spring Boot vers Railway en gardant Render et sa configur
 - Les variables par défaut dans `application.yml` contiennent des secrets Render : elles doivent rester des secours uniquement et idéalement être nettoyées plus tard.
 - CORS doit inclure Railway pour éviter les blocages frontend.
 
+## Stockage DocumentArchive avec Backblaze B2
+- Un `B2StorageService` a été ajouté pour stocker les documents PDF/Word sur Backblaze B2 via l’API S3.
+- Le module `DocumentArchive` migre vers B2 ; les APK et pièces jointes restent sur filesystem local pour l’instant.
+- La bascule B2 est pilotée par `B2_ENABLED=true` dans les variables d’environnement.
+- Les anciens documents restent fonctionnels et sont migrés vers B2 via un batch one-shot.
+- La migration batch est déclenchée au démarrage avec `RUN_DOCUMENT_ARCHIVE_MIGRATION=true` (voir `DocumentArchiveMigrationRunner`).
+
+## Variables d’environnement Railway supplémentaires (B2)
+- `B2_ENABLED` (booléen, défaut `false`)
+- `B2_KEY_ID`
+- `B2_APPLICATION_KEY`
+- `B2_BUCKET` (défaut `document-archive`)
+- `B2_ENDPOINT` (ex: `https://s3.us-west-002.backblazeb2.com`)
+- `B2_REGION` (défaut `us-west-002`)
+
 ## Rollback
 - Reconfigurer le frontend sur l’URL Render.
 - Ne pas supprimer la base Render avant validation.

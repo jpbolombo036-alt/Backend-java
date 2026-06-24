@@ -7,9 +7,7 @@ import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.DocumentArchiveRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
-import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -18,9 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,9 +27,7 @@ public class DocumentArchiveService {
 
     private final DocumentArchiveRepository documentArchiveRepository;
     private final AuditService auditService;
-
-    @Value("${app.upload.document-archive-dir:uploads/documents}")
-    private String uploadDir;
+    private final B2StorageService b2StorageService;
 
     public DocumentArchiveDTO uploadDocument(MultipartFile file, DocumentArchiveRequest request, Long uploadedBy, String username) throws IOException {
         log.info("Starting document archive upload: file={}, size={}, user={}", file.getOriginalFilename(), file.getSize(), uploadedBy);
@@ -64,26 +57,14 @@ public class DocumentArchiveService {
             throw new IOException("Format de fichier non supporté. Seuls PDF et Word (.doc, .docx) sont autorisés.");
         }
 
-        Path uploadPath = resolveWritableUploadDirectory();
-        log.info("Upload directory resolved to: {}", uploadPath);
-
         String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
         String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
-        Path filePath = uploadPath.resolve(uniqueFileName);
-
-        log.info("Saving document to: {}", filePath.toAbsolutePath());
-        try {
-            Files.copy(file.getInputStream(), filePath);
-            log.info("Document saved successfully");
-        } catch (IOException e) {
-            log.error("Failed to save file: {}", e.getMessage(), e);
-            throw new IOException("Impossible de sauvegarder le fichier: " + e.getMessage());
-        }
+        String objectKey = b2StorageService.upload(file, b2StorageService.buildObjectKey(uniqueFileName), contentType);
 
         DocumentArchive document = DocumentArchive.builder()
                 .fileName(uniqueFileName)
                 .originalFileName(originalFileName)
-                .filePath(filePath.toString())
+                .filePath(objectKey)
                 .fileSize(file.getSize())
                 .contentType(contentType)
                 .title(request.getTitle())
@@ -139,50 +120,27 @@ public class DocumentArchiveService {
         document.setDownloadCount(document.getDownloadCount() + 1);
         documentArchiveRepository.save(document);
 
-        Path filePath = Paths.get(document.getFilePath());
-        if (!Files.exists(filePath)) {
-            throw new ResourceNotFoundException("Fichier physique non trouvé");
+        String objectKey = document.getFilePath();
+        if (objectKey == null) {
+            objectKey = b2StorageService.buildObjectKey(document.getFileName());
         }
-        return new UrlResource(filePath.toUri());
+        return b2StorageService.downloadAsResource(objectKey, document.getOriginalFileName(), document.getContentType());
     }
 
     public void deleteDocument(Long id, Long userId) throws IOException {
         DocumentArchive document = documentArchiveRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document non trouvé avec l'ID: " + id));
 
-        Path filePath = Paths.get(document.getFilePath());
-        if (Files.exists(filePath)) {
-            Files.delete(filePath);
+        String objectKey = document.getFilePath();
+        if (objectKey == null) {
+            objectKey = b2StorageService.buildObjectKey(document.getFileName());
         }
+        b2StorageService.delete(objectKey);
 
         documentArchiveRepository.delete(document);
 
         auditService.logAction("DELETE_DOCUMENT", "Document: " + document.getOriginalFileName(), userId);
         log.info("Document deleted: {}", document.getOriginalFileName());
-    }
-
-    private Path resolveWritableUploadDirectory() throws IOException {
-        Path configuredPath = Paths.get(uploadDir).toAbsolutePath().normalize();
-        try {
-            if (!Files.exists(configuredPath)) {
-                Files.createDirectories(configuredPath);
-            }
-            if (Files.isWritable(configuredPath)) {
-                return configuredPath;
-            }
-            log.warn("Configured upload directory is not writable, falling back to /tmp: {}", configuredPath);
-        } catch (IOException e) {
-            log.warn("Failed to use configured upload directory [{}], falling back to /tmp: {}", configuredPath, e.getMessage());
-        }
-
-        Path fallbackPath = Paths.get(System.getProperty("java.io.tmpdir"), "uploads", "documents").toAbsolutePath().normalize();
-        if (!Files.exists(fallbackPath)) {
-            Files.createDirectories(fallbackPath);
-        }
-        if (!Files.isWritable(fallbackPath)) {
-            throw new IOException("Aucun répertoire d'upload accessible en écriture. Vérifié: " + configuredPath + " et " + fallbackPath);
-        }
-        return fallbackPath;
     }
 
     private boolean isSupportedContentType(String contentType) {
