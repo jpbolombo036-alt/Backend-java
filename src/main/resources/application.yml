@@ -60,6 +60,7 @@ app:
   upload:
     dir: ${UPLOAD_DIR:./uploads/apk}
     attachments-dir: ${ATTACHMENTS_DIR:./uploads/attachments}
+    document-archive-dir: ${DOCUMENT_ARCHIVE_DIR:./uploads/documents}
     max-file-size: ${MAX_FILE_SIZE:150MB}
 
 logging:
