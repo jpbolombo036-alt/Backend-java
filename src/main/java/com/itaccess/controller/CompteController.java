@@ -28,7 +28,7 @@ public class CompteController {
     @Operation(summary = "Liste des comptes", description = "Retourne tous les comptes avec pagination")
     public ResponseEntity<PageResponse<CompteDTO>> getAllComptes(
             @Parameter(description = "Numéro de page (0-indexed)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Taille de la page") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Taille de la page") @RequestParam(defaultValue = "25") int size,
             @Parameter(description = "Champ de tri") @RequestParam(defaultValue = "id") String sortBy,
             @Parameter(description = "Direction du tri (asc/desc)") @RequestParam(defaultValue = "asc") String sortDir) {
         return ResponseEntity.ok(compteService.getAllComptes(page, size, sortBy, sortDir));

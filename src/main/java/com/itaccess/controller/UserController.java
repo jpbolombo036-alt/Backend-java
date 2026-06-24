@@ -37,7 +37,7 @@ public class UserController {
     @Operation(summary = "Liste des utilisateurs", description = "Retourne tous les utilisateurs avec pagination (admin uniquement)")
     public ResponseEntity<PageResponse<UserDTO>> getAllUsers(
             @Parameter(description = "Numéro de page (0-indexed)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Taille de la page") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Taille de la page") @RequestParam(defaultValue = "25") int size,
             @Parameter(description = "Champ de tri") @RequestParam(defaultValue = "id") String sortBy,
             @Parameter(description = "Direction du tri (asc/desc)") @RequestParam(defaultValue = "asc") String sortDir) {
         return ResponseEntity.ok(userService.getAllUsers(page, size, sortBy, sortDir));

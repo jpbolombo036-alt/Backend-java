@@ -27,7 +27,7 @@ public class ApplicationController {
     @Operation(summary = "Liste des applications", description = "Retourne toutes les applications avec pagination")
     public ResponseEntity<PageResponse<ApplicationDTO>> getAllApplications(
             @Parameter(description = "Numéro de page (0-indexed)") @RequestParam(defaultValue = "0") int page,
-            @Parameter(description = "Taille de la page") @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "Taille de la page") @RequestParam(defaultValue = "25") int size,
             @Parameter(description = "Champ de tri") @RequestParam(defaultValue = "id") String sortBy,
             @Parameter(description = "Direction du tri (asc/desc)") @RequestParam(defaultValue = "asc") String sortDir) {
         return ResponseEntity.ok(applicationService.getAllApplications(page, size, sortBy, sortDir));
