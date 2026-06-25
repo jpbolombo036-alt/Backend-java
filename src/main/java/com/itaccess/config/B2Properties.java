@@ -11,8 +11,8 @@ public class B2Properties {
     private boolean enabled = false;
     private String keyId;
     private String applicationKey;
-    private String bucket = "taccess-storage";
+    private String bucket = "itaccess-storage";
     private String endpoint;
-    private String region = "us-west-002";
+    private String region = "us-east-005";
     private String documentsPrefix = "document-archive/";
 }

@@ -68,7 +68,7 @@ app:
       enabled: ${B2_ENABLED:false}
       key-id: ${B2_KEY_ID:}
       application-key: ${B2_APPLICATION_KEY:}
-      bucket: ${B2_BUCKET:taccess-storage}
+      bucket: ${B2_BUCKET:itaccess-storage}
       endpoint: ${B2_ENDPOINT:https://s3.us-east-005.backblazeb2.com}
       region: ${B2_REGION:us-east-005}
       documents-prefix: ${B2_DOCUMENTS_PREFIX:document-archive/}

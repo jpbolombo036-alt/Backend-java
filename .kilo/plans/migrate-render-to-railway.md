@@ -54,8 +54,8 @@ Passer le backend Java/Spring Boot vers Railway en gardant Render et sa configur
 - `B2_KEY_ID`
 - `B2_APPLICATION_KEY`
 - `B2_BUCKET` (défaut `document-archive`)
-- `B2_ENDPOINT` (ex: `https://s3.us-west-002.backblazeb2.com`)
-- `B2_REGION` (défaut `us-west-002`)
+- `B2_ENDPOINT` (ex: `https://s3.us-east-005.backblazeb2.com`)
+- `B2_REGION` (défaut `us-east-005`)
 
 ## Rollback
 - Reconfigurer le frontend sur l’URL Render.
