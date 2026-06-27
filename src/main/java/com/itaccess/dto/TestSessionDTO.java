@@ -30,4 +30,8 @@ public class TestSessionDTO {
     private Integer testsBugCount;
     private Integer testsEnCoursCount;
     private String plateforme;
+    private Integer totalTests;
+    private Integer testsOk;
+    private Integer testsBug;
+    private Integer testsEnCours;
 }

@@ -197,6 +197,10 @@ public class TestSessionService {
                 .testsBugCount((int) testsBug)
                 .testsEnCoursCount((int) testsEnCours)
                 .plateforme(session.getPlateforme())
+                .totalTests(tests.size())
+                .testsOk((int) testsOk)
+                .testsBug((int) testsBug)
+                .testsEnCours((int) testsEnCours)
                 .build();
     }
     
