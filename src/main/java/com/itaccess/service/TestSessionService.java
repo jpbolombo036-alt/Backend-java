@@ -17,7 +17,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.format.DateTimeFormatter;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -35,8 +34,6 @@ public class TestSessionService {
     private final TestRepository testRepository;
     private final ApplicationRepository applicationRepository;
     
-    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
-
     public List<TestSessionDTO> getAllTestSessions() {
         return toOptimizedDTOList(testSessionRepository.findAll());
     }
@@ -61,6 +58,7 @@ public class TestSessionService {
                 .version(request.getVersion())
                 .nomDocument(request.getNomDocument())
                 .statut(request.getStatut() != null ? request.getStatut() : "OPEN")
+                .plateforme(request.getPlateforme() != null ? request.getPlateforme() : "Web")
                 .createdBy(createdBy)
                 .build();
         
@@ -85,6 +83,7 @@ public class TestSessionService {
         session.setVersion(request.getVersion());
         session.setNomDocument(request.getNomDocument());
         session.setStatut(request.getStatut());
+        if (request.getPlateforme() != null) session.setPlateforme(request.getPlateforme());
         
         TestSession updatedSession = testSessionRepository.save(session);
         return toDTOWithStats(updatedSession);
@@ -175,6 +174,7 @@ public class TestSessionService {
         long testsOk = tests.stream().filter(t -> "OK".equals(t.getStatut())).count();
         long testsBug = tests.stream().filter(t -> "BUG".equals(t.getStatut())).count();
         long testsEnCours = tests.stream().filter(t -> "EN COURS".equals(t.getStatut())).count();
+        long testsResolved = tests.stream().filter(t -> Boolean.TRUE.equals(t.getResolved())).count();
 
         return TestSessionDTO.builder()
                 .id(session.getId())
@@ -191,10 +191,12 @@ public class TestSessionService {
                 .createdByUsername(userNom)
                 .createdByRole(userRole)
                 .tests(tests.stream().map(this::toTestDTO).collect(Collectors.toList()))
-                .totalTests(tests.size())
-                .testsOk((int) testsOk)
-                .testsBug((int) testsBug)
-                .testsEnCours((int) testsEnCours)
+                .testsCount(tests.size())
+                .testsResolvedCount((int) testsResolved)
+                .testsOkCount((int) testsOk)
+                .testsBugCount((int) testsBug)
+                .testsEnCoursCount((int) testsEnCours)
+                .plateforme(session.getPlateforme())
                 .build();
     }
     
@@ -215,6 +217,7 @@ public class TestSessionService {
                 .commentaires(test.getCommentaires())
                 .createdBy(test.getCreatedBy())
                 .testNumber(test.getTestNumber())
+                .resolved(test.getResolved())
                 .build();
     }
 }

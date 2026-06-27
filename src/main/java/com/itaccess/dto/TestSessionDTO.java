@@ -24,8 +24,10 @@ public class TestSessionDTO {
     private String createdByUsername;
     private String createdByRole;
     private List<TestDTO> tests;
-    private Integer totalTests;
-    private Integer testsOk;
-    private Integer testsBug;
-    private Integer testsEnCours;
+    private Integer testsCount;
+    private Integer testsResolvedCount;
+    private Integer testsOkCount;
+    private Integer testsBugCount;
+    private Integer testsEnCoursCount;
+    private String plateforme;
 }

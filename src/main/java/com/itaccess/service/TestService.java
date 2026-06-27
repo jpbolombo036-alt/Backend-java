@@ -43,14 +43,19 @@ public class TestService {
 
     @Transactional(isolation = Isolation.SERIALIZABLE)
     public TestDTO createTest(TestRequest request, Long createdBy) {
-        // Validation de l'application
+        if (request.getFonction() == null || request.getFonction().trim().isEmpty()) {
+            throw new IllegalArgumentException("La fonction est requise");
+        }
+        if (request.getStatut() == null || request.getStatut().trim().isEmpty()) {
+            throw new IllegalArgumentException("Le statut est requis");
+        }
+
         if (request.getApplicationId() != null && request.getApplicationId() != 0) {
             if (!applicationRepository.existsById(request.getApplicationId())) {
                 throw new ResourceNotFoundException("Application non trouvée avec l'ID: " + request.getApplicationId());
             }
         }
 
-        // Validation de la session (maintenant cohérente avec l'application)
         if (request.getSessionId() != null) {
             if (request.getSessionId() == 0) {
                 throw new IllegalArgumentException("ID de session invalide: 0");
@@ -62,12 +67,11 @@ public class TestService {
 
         Long appId = (request.getApplicationId() != null && request.getApplicationId() != 0) ? request.getApplicationId() : null;
 
-        // Récupérer le prochain numéro de test pour cette session (commence à 1 pour chaque session)
         Long nextTestNumber = getNextTestNumberForSession(request.getSessionId());
 
         TestStep test = TestStep.builder()
                 .sessionId(request.getSessionId())
-                .testNumber(nextTestNumber) // Utilisation du nouveau champ métier
+                .testNumber(nextTestNumber)
                 .applicationId(appId)
                 .applicationNom(request.getApplicationNom())
                 .version(request.getVersion())
@@ -80,6 +84,7 @@ public class TestService {
                 .statut(request.getStatut())
                 .commentaires(request.getCommentaires())
                 .createdBy(createdBy)
+                .resolved(request.getResolved() != null ? request.getResolved() : false)
                 .build();
 
         TestStep savedTest = testRepository.save(test);
@@ -95,18 +100,19 @@ public class TestService {
             throw new SecurityException("Non autorisé à modifier ce test");
         }
 
-        test.setSessionId(request.getSessionId());
-        test.setApplicationId(request.getApplicationId());
-        test.setApplicationNom(request.getApplicationNom());
-        test.setVersion(request.getVersion());
-        test.setEnvironnement(request.getEnvironnement());
-        test.setFonction(request.getFonction());
-        test.setPrecondition(request.getPrecondition());
-        test.setEtapes(request.getEtapes());
-        test.setResultatAttendu(request.getResultatAttendu());
-        test.setResultatObtenu(request.getResultatObtenu());
-        test.setStatut(request.getStatut());
-        test.setCommentaires(request.getCommentaires());
+        if (request.getSessionId() != null) test.setSessionId(request.getSessionId());
+        if (request.getApplicationId() != null) test.setApplicationId(request.getApplicationId());
+        if (request.getApplicationNom() != null) test.setApplicationNom(request.getApplicationNom());
+        if (request.getVersion() != null) test.setVersion(request.getVersion());
+        if (request.getEnvironnement() != null) test.setEnvironnement(request.getEnvironnement());
+        if (request.getFonction() != null) test.setFonction(request.getFonction());
+        if (request.getPrecondition() != null) test.setPrecondition(request.getPrecondition());
+        if (request.getEtapes() != null) test.setEtapes(request.getEtapes());
+        if (request.getResultatAttendu() != null) test.setResultatAttendu(request.getResultatAttendu());
+        if (request.getResultatObtenu() != null) test.setResultatObtenu(request.getResultatObtenu());
+        if (request.getStatut() != null) test.setStatut(request.getStatut());
+        if (request.getCommentaires() != null) test.setCommentaires(request.getCommentaires());
+        if (request.getResolved() != null) test.setResolved(request.getResolved());
 
         TestStep updatedTest = testRepository.save(test);
         return toDTO(updatedTest);
@@ -158,6 +164,7 @@ public class TestService {
                 .commentaires(test.getCommentaires())
                 .createdBy(test.getCreatedBy())
                 .testNumber(test.getTestNumber())
+                .resolved(test.getResolved())
                 .build();
     }
 }

@@ -18,6 +18,9 @@ public class DashboardStatsDTO {
     private Integer testsRateOk;
     private Integer testsRateBug;
     private Integer testsRatePending;
+    private Integer testsResolved;
+    private Integer testsUnresolved;
+    private Integer testsRateResolved;
     private Integer activeAccounts;
     private Integer recentSessions;
     private Integer bugReports;

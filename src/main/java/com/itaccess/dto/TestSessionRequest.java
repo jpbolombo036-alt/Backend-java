@@ -22,4 +22,5 @@ public class TestSessionRequest {
     private String nomDocument;
     
     private String statut;
+    private String plateforme;
 }

@@ -1,6 +1,6 @@
 package com.itaccess.dto;
 
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -22,7 +22,6 @@ public class TestRequest {
     private String version;
     private String environnement;
     
-    @NotBlank(message = "La fonction est requise")
     private String fonction;
     
     private String precondition;
@@ -34,11 +33,12 @@ public class TestRequest {
     @JsonProperty("resultatObtenu")
     private String resultatObtenu;
     
-    @NotBlank(message = "Le statut est requis")
     private String statut;
     
     private String commentaires;
     
     @JsonProperty("image")
     private String image;
+
+    private Boolean resolved;
 }

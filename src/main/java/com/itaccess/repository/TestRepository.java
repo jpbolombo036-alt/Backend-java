@@ -24,4 +24,10 @@ public interface TestRepository extends JpaRepository<TestStep, Long> {
     void deleteBySessionId(Long sessionId);
     
     Long countByStatut(String statut);
+
+    @Query("SELECT COUNT(t) FROM TestStep t WHERE t.resolved = true")
+    long countByResolvedTrue();
+
+    @Query("SELECT COUNT(t) FROM TestStep t WHERE t.resolved = false OR t.resolved IS NULL")
+    long countByResolvedFalseOrNull();
 }

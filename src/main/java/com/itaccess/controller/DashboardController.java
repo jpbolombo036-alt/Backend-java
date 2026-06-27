@@ -29,17 +29,20 @@ public class DashboardController {
         long totalApplications = applicationRepository.count();
         long totalSessions = testSessionRepository.count();
         long totalTests = testRepository.count();
-        long totalUsers = userRepository.count(); // Tous les utilisateurs (USER + ADMIN)
+        long totalUsers = userRepository.count();
         long totalAccounts = compteRepository.count();
         long testsOk = testRepository.countByStatut("OK");
         long testsBug = testRepository.countByStatut("BUG");
         long testsEnCours = testRepository.countByStatut("EN COURS");
+        long testsResolved = testRepository.countByResolvedTrue();
+        long testsUnresolved = testRepository.countByResolvedFalseOrNull();
         long totalBugReports = bugRepository.count();
 
         int totalTestsCount = (int) totalTests;
         int rateOk = totalTestsCount > 0 ? (int) ((testsOk * 100) / totalTestsCount) : 0;
         int rateBug = totalTestsCount > 0 ? (int) ((testsBug * 100) / totalTestsCount) : 0;
         int ratePending = totalTestsCount > 0 ? (int) ((testsEnCours * 100) / totalTestsCount) : 0;
+        int rateResolved = totalTestsCount > 0 ? (int) ((testsResolved * 100) / totalTestsCount) : 0;
 
         return DashboardStatsDTO.builder()
                 .applications((int) totalApplications)
@@ -53,6 +56,9 @@ public class DashboardController {
                 .testsRateOk(rateOk)
                 .testsRateBug(rateBug)
                 .testsRatePending(ratePending)
+                .testsResolved((int) testsResolved)
+                .testsUnresolved((int) testsUnresolved)
+                .testsRateResolved(rateResolved)
                 .activeAccounts((int) totalAccounts)
                 .recentSessions((int) totalSessions)
                 .bugReports((int) totalBugReports)

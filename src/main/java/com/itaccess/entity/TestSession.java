@@ -44,6 +44,10 @@ public class TestSession {
     @Column(name = "created_by")
     private Long createdBy;
     
+    @Builder.Default
+    @Column(length = 10)
+    private String plateforme = "Web";
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "application_id", insertable = false, updatable = false)
     private Application application;

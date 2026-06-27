@@ -62,6 +62,10 @@ public class TestStep {
     @Column(name = "test_number")
     private Long testNumber;
 
+    @Builder.Default
+    @Column(nullable = false)
+    private Boolean resolved = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", insertable = false, updatable = false)
     private TestSession session;
