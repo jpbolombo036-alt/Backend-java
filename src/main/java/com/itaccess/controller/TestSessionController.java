@@ -87,4 +87,12 @@ public class TestSessionController {
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         return ResponseEntity.ok(testSessionService.requestCloseSession(id, currentUser.getId()));
     }
+
+    @PostMapping("/{id}/reopen")
+    @PreAuthorize("hasRole('admin')")
+    @Operation(summary = "Réouvrir une session", description = "Réouvre une session de test cloturée (admin uniquement)")
+    public ResponseEntity<TestSessionDTO> reopenSession(
+            @PathVariable Long id) {
+        return ResponseEntity.ok(testSessionService.reopenSession(id));
+    }
 }

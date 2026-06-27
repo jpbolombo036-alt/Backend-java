@@ -134,7 +134,22 @@ public class TestSessionService {
         
         return toDTOWithStats(closedSession);
     }
-    
+
+    @Transactional
+    public TestSessionDTO reopenSession(Long id) {
+        TestSession session = testSessionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Session non trouvée avec l'ID: " + id));
+
+        if (!"CLOSED".equals(session.getStatut())) {
+            throw new IllegalStateException("Seules les sessions cloturées peuvent être réouvertes");
+        }
+
+        session.setStatut("OPEN");
+        TestSession reopenedSession = testSessionRepository.save(session);
+
+        return toDTOWithStats(reopenedSession);
+    }
+
     private List<TestSessionDTO> toOptimizedDTOList(List<TestSession> sessions) {
         if (sessions.isEmpty()) return Collections.emptyList();
 
