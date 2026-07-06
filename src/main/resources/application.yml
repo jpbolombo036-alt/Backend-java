@@ -73,6 +73,11 @@ app:
       region: ${B2_REGION:us-east-005}
       documents-prefix: ${B2_DOCUMENTS_PREFIX:document-archive/}
 
+  openai:
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_MODEL:gpt-4o}
+    max-tokens: ${OPENAI_MAX_TOKENS:1000}
+
 logging:
   level:
     com.itaccess: ${LOG_LEVEL:INFO}
