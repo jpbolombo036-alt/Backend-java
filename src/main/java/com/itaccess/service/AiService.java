@@ -39,7 +39,8 @@ public class AiService {
     @Value("${app.openai.max-tokens:1000}")
     private int maxTokens;
 
-    private static final String OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+    @Value("${app.openai.url:https://api.openai.com/v1/chat/completions}")
+    private String openAiUrl;
 
     private static final String SYSTEM_PROMPT = """
             Tu es l'assistant IA de **IT Access Manager**, une application de gestion des accès IT.
@@ -75,7 +76,7 @@ public class AiService {
             ObjectNode requestBody = buildRequestBody(messages);
 
             String responseJson = restClient.post()
-                    .uri(OPENAI_URL)
+                    .uri(openAiUrl)
                     .header("Authorization", "Bearer " + openAiApiKey)
                     .header("Content-Type", "application/json")
                     .body(requestBody.toString())
@@ -255,7 +256,7 @@ public class AiService {
         body.set("messages", newMessages);
 
         String finalResponseJson = restClient.post()
-                .uri(OPENAI_URL)
+                .uri(openAiUrl)
                 .header("Authorization", "Bearer " + openAiApiKey)
                 .header("Content-Type", "application/json")
                 .body(body.toString())
