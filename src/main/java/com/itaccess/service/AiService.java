@@ -7,6 +7,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.itaccess.dto.AiChatRequest;
 import com.itaccess.dto.AiChatResponse;
 import com.itaccess.repository.*;
+import com.itaccess.security.UserInfo;
+import com.itaccess.entity.Todo;
+import com.itaccess.entity.BlocNote;
+import com.itaccess.entity.Bug;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +32,7 @@ public class AiService {
     private final TestRepository testRepository;
     private final BlocNoteRepository blocNoteRepository;
     private final DocumentArchiveRepository documentArchiveRepository;
+    private final BugRepository bugRepository;
     private final ObjectMapper objectMapper;
 
     @Value("${app.openai.api-key:}")
@@ -63,7 +68,7 @@ public class AiService {
             - Format Markdown autorisé (listes, gras, code)
             """;
 
-    public AiChatResponse chat(List<AiChatRequest.AiMessage> messages) {
+    public AiChatResponse chat(List<AiChatRequest.AiMessage> messages, UserInfo currentUser) {
         if (openAiApiKey == null || openAiApiKey.isBlank()) {
             return AiChatResponse.builder()
                     .error(true)
@@ -83,7 +88,7 @@ public class AiService {
                     .retrieve()
                     .body(String.class);
 
-            return processOpenAiResponse(responseJson, messages, restClient);
+            return processOpenAiResponse(responseJson, messages, restClient, currentUser);
 
         } catch (Exception e) {
             log.error("Erreur lors de l'appel à OpenAI", e);
@@ -164,6 +169,93 @@ public class AiService {
                 "Retourne la liste des documents archivés dans le système.",
                 objectMapper.createObjectNode()));
 
+        // --- NEW WRITE / MUTATIVE TOOLS ---
+
+        // 1. Create Todo
+        ObjectNode createTodoProps = objectMapper.createObjectNode();
+        ObjectNode titleProp = objectMapper.createObjectNode();
+        titleProp.put("type", "string");
+        titleProp.put("description", "Le titre de la tâche (obligatoire).");
+        createTodoProps.set("title", titleProp);
+        ObjectNode descProp = objectMapper.createObjectNode();
+        descProp.put("type", "string");
+        descProp.put("description", "La description de la tâche.");
+        createTodoProps.set("description", descProp);
+        ObjectNode priorityProp = objectMapper.createObjectNode();
+        priorityProp.put("type", "string");
+        priorityProp.put("description", "Priorité : 'normal', 'high', 'low'. Par défaut 'normal'.");
+        createTodoProps.set("priority", priorityProp);
+        ObjectNode dueDateProp = objectMapper.createObjectNode();
+        dueDateProp.put("type", "string");
+        dueDateProp.put("description", "Date d'échéance de la tâche (ex: YYYY-MM-DD).");
+        createTodoProps.set("dueDate", dueDateProp);
+        tools.add(buildTool("create_todo",
+                "Crée une nouvelle tâche (todo) pour l'utilisateur connecté.",
+                createTodoProps));
+
+        // 2. Toggle Todo Complete
+        ObjectNode toggleTodoProps = objectMapper.createObjectNode();
+        ObjectNode idProp = objectMapper.createObjectNode();
+        idProp.put("type", "integer");
+        idProp.put("description", "L'ID de la tâche à cocher/décoche (obligatoire).");
+        toggleTodoProps.set("id", idProp);
+        tools.add(buildTool("toggle_todo_complete",
+                "Bascule le statut d'une tâche (complétée ou non) par son ID.",
+                toggleTodoProps));
+
+        // 3. Create Bloc Note
+        ObjectNode createNoteProps = objectMapper.createObjectNode();
+        ObjectNode noteTitleProp = objectMapper.createObjectNode();
+        noteTitleProp.put("type", "string");
+        noteTitleProp.put("description", "Le titre de la note (obligatoire).");
+        createNoteProps.set("title", noteTitleProp);
+        ObjectNode noteContentProp = objectMapper.createObjectNode();
+        noteContentProp.put("type", "string");
+        noteContentProp.put("description", "Le contenu textuel de la note (obligatoire).");
+        createNoteProps.set("content", noteContentProp);
+        ObjectNode noteStatusProp = objectMapper.createObjectNode();
+        noteStatusProp.put("type", "string");
+        noteStatusProp.put("description", "Statut : 'DRAFT', 'PUBLISHED'. Par défaut 'DRAFT'.");
+        createNoteProps.set("status", noteStatusProp);
+        ObjectNode noteAppIdProp = objectMapper.createObjectNode();
+        noteAppIdProp.put("type", "integer");
+        noteAppIdProp.put("description", "ID de l'application associée (optionnel).");
+        createNoteProps.set("applicationId", noteAppIdProp);
+        tools.add(buildTool("create_bloc_note",
+                "Crée une nouvelle note dans le bloc-notes.",
+                createNoteProps));
+
+        // 4. Create Bug
+        ObjectNode createBugProps = objectMapper.createObjectNode();
+        ObjectNode bugTitleProp = objectMapper.createObjectNode();
+        bugTitleProp.put("type", "string");
+        bugTitleProp.put("description", "Titre court ou résumé du bug (obligatoire).");
+        createBugProps.set("title", bugTitleProp);
+        ObjectNode bugSeverityProp = objectMapper.createObjectNode();
+        bugSeverityProp.put("type", "string");
+        bugSeverityProp.put("description", "Gravité : 'CRITICAL', 'MAJOR', 'MINOR'. Par défaut 'MAJOR'.");
+        createBugProps.set("severity", bugSeverityProp);
+        ObjectNode bugPriorityProp = objectMapper.createObjectNode();
+        bugPriorityProp.put("type", "string");
+        bugPriorityProp.put("description", "Priorité : 'HIGH', 'MEDIUM', 'LOW'. Par défaut 'MEDIUM'.");
+        createBugProps.set("priority", bugPriorityProp);
+        ObjectNode bugReproProp = objectMapper.createObjectNode();
+        bugReproProp.put("type", "string");
+        bugReproProp.put("description", "Étapes de reproduction de l'anomalie.");
+        createBugProps.set("reproducibility", bugReproProp);
+        ObjectNode bugStepIdProp = objectMapper.createObjectNode();
+        bugStepIdProp.put("type", "integer");
+        bugStepIdProp.put("description", "ID de l'étape de test (TestStep) liée au bug (optionnel).");
+        createBugProps.set("testStepId", bugStepIdProp);
+        tools.add(buildTool("create_bug",
+                "Déclare un nouveau bug lié à une anomalie.",
+                createBugProps));
+
+        // 5. Get Bugs
+        tools.add(buildTool("get_bugs",
+                "Retourne la liste globale des bugs déclarés dans le système.",
+                objectMapper.createObjectNode()));
+
         return tools;
     }
 
@@ -186,7 +278,8 @@ public class AiService {
 
     private AiChatResponse processOpenAiResponse(String responseJson,
                                                    List<AiChatRequest.AiMessage> messages,
-                                                   RestClient restClient) throws Exception {
+                                                   RestClient restClient,
+                                                   UserInfo currentUser) throws Exception {
         JsonNode root = objectMapper.readTree(responseJson);
         JsonNode choice = root.path("choices").path(0);
         JsonNode message = choice.path("message");
@@ -195,7 +288,7 @@ public class AiService {
         // Check if GPT wants to call a function
         JsonNode toolCalls = message.path("tool_calls");
         if (!toolCalls.isMissingNode() && toolCalls.isArray() && toolCalls.size() > 0) {
-            return handleFunctionCalls(toolCalls, messages, tokensUsed, restClient);
+            return handleFunctionCalls(toolCalls, messages, tokensUsed, restClient, currentUser);
         }
 
         // Direct text response
@@ -210,7 +303,8 @@ public class AiService {
     private AiChatResponse handleFunctionCalls(JsonNode toolCalls,
                                                 List<AiChatRequest.AiMessage> messages,
                                                 int tokensUsed,
-                                                RestClient restClient) throws Exception {
+                                                RestClient restClient,
+                                                UserInfo currentUser) throws Exception {
         // Build a new message list with function results
         ArrayNode newMessages = objectMapper.createArrayNode();
 
@@ -240,7 +334,7 @@ public class AiService {
             String functionName = toolCall.path("function").path("name").asText();
             String argsJson = toolCall.path("function").path("arguments").asText("{}");
 
-            String functionResult = executeFunction(functionName, argsJson);
+            String functionResult = executeFunction(functionName, argsJson, currentUser);
 
             ObjectNode toolResultMsg = objectMapper.createObjectNode();
             toolResultMsg.put("role", "tool");
@@ -275,7 +369,7 @@ public class AiService {
                 .build();
     }
 
-    private String executeFunction(String functionName, String argsJson) {
+    private String executeFunction(String functionName, String argsJson, UserInfo currentUser) {
         try {
             return switch (functionName) {
                 case "get_dashboard_stats" -> getDashboardStats();
@@ -286,6 +380,11 @@ public class AiService {
                 case "get_test_sessions" -> getTestSessions();
                 case "get_bloc_notes" -> getBlocNotes();
                 case "get_documents" -> getDocuments();
+                case "create_todo" -> createTodo(argsJson, currentUser);
+                case "toggle_todo_complete" -> toggleTodoComplete(argsJson, currentUser);
+                case "create_bloc_note" -> createBlocNote(argsJson, currentUser);
+                case "create_bug" -> createBug(argsJson, currentUser);
+                case "get_bugs" -> getBugs();
                 default -> "{\"error\": \"Fonction inconnue : " + functionName + "\"}";
             };
         } catch (Exception e) {
@@ -441,6 +540,139 @@ public class AiService {
         ObjectNode result = objectMapper.createObjectNode();
         result.put("total", docs.size());
         result.set("documents", objectMapper.valueToTree(docs));
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String createTodo(String argsJson, UserInfo currentUser) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        String title = args.path("title").asText(null);
+        if (title == null || title.isBlank()) {
+            return "{\"error\": \"Le titre est obligatoire pour créer une tâche.\"}";
+        }
+        String description = args.path("description").asText(null);
+        String priority = args.path("priority").asText("normal");
+        String dueDate = args.path("dueDate").asText(null);
+
+        Todo todo = Todo.builder()
+                .title(title)
+                .description(description)
+                .priority(priority)
+                .dueDate(dueDate)
+                .completed(false)
+                .createdBy(currentUser.getId())
+                .build();
+
+        Todo saved = todoRepository.save(todo);
+        
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("success", true);
+        result.put("message", "Tâche créée avec succès");
+        result.put("id", saved.getId());
+        result.put("title", saved.getTitle());
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String toggleTodoComplete(String argsJson, UserInfo currentUser) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        long id = args.path("id").asLong(0);
+        if (id <= 0) {
+            return "{\"error\": \"L'identifiant de la tâche (id) est obligatoire.\"}";
+        }
+
+        Todo todo = todoRepository.findById(id)
+                .orElseThrow(() -> new com.itaccess.exception.ResourceNotFoundException("Tâche non trouvée avec l'ID: " + id));
+
+        if (!"admin".equals(currentUser.getRole()) && !todo.getCreatedBy().equals(currentUser.getId())) {
+            return "{\"error\": \"Non autorisé à modifier cette tâche.\"}";
+        }
+
+        todo.setCompleted(!todo.getCompleted());
+        Todo saved = todoRepository.save(todo);
+
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("success", true);
+        result.put("message", "Statut de la tâche mis à jour");
+        result.put("id", saved.getId());
+        result.put("completed", saved.getCompleted());
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String createBlocNote(String argsJson, UserInfo currentUser) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        String title = args.path("title").asText(null);
+        String content = args.path("content").asText(null);
+        if (title == null || title.isBlank() || content == null || content.isBlank()) {
+            return "{\"error\": \"Le titre et le contenu sont obligatoires pour créer une note.\"}";
+        }
+        String status = args.path("status").asText("DRAFT");
+        Long appId = args.has("applicationId") ? args.path("applicationId").asLong() : null;
+
+        BlocNote note = BlocNote.builder()
+                .title(title)
+                .content(content)
+                .status(status)
+                .applicationId(appId)
+                .createdBy(currentUser.getId())
+                .createdByUsername(currentUser.getUsername())
+                .build();
+
+        BlocNote saved = blocNoteRepository.save(note);
+
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("success", true);
+        result.put("message", "Note créée avec succès");
+        result.put("id", saved.getId());
+        result.put("title", saved.getTitle());
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String createBug(String argsJson, UserInfo currentUser) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        String title = args.path("title").asText(null);
+        if (title == null || title.isBlank()) {
+            return "{\"error\": \"Le titre du bug est obligatoire.\"}";
+        }
+        String severity = args.path("severity").asText("MAJOR");
+        String priority = args.path("priority").asText("MEDIUM");
+        String reproducibility = args.path("reproducibility").asText(null);
+        Long testStepId = args.has("testStepId") ? args.path("testStepId").asLong() : null;
+
+        Bug bug = Bug.builder()
+                .title(title)
+                .severity(severity)
+                .priority(priority)
+                .reproducibility(reproducibility)
+                .testStepId(testStepId)
+                .status("OPEN")
+                .assignedTo(currentUser.getId())
+                .build();
+
+        Bug saved = bugRepository.save(bug);
+
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("success", true);
+        result.put("message", "Bug déclaré avec succès");
+        result.put("id", saved.getId());
+        result.put("title", saved.getTitle());
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String getBugs() throws Exception {
+        var bugs = bugRepository.findAll().stream()
+                .limit(30)
+                .map(b -> {
+                    ObjectNode node = objectMapper.createObjectNode();
+                    node.put("id", b.getId());
+                    node.put("titre", b.getTitle());
+                    node.put("gravite", b.getSeverity());
+                    node.put("priorite", b.getPriority());
+                    node.put("statut", b.getStatus());
+                    return node;
+                })
+                .toList();
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("total", bugs.size());
+        result.set("bugs", objectMapper.valueToTree(bugs));
         return objectMapper.writeValueAsString(result);
     }
 }

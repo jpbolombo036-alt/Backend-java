@@ -46,7 +46,7 @@ public class AiController {
             );
         }
 
-        AiChatResponse response = aiService.chat(request.getMessages());
+        AiChatResponse response = aiService.chat(request.getMessages(), currentUser);
         return ResponseEntity.ok(response);
     }
 }
