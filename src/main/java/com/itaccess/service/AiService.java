@@ -11,6 +11,8 @@ import com.itaccess.security.UserInfo;
 import com.itaccess.entity.Todo;
 import com.itaccess.entity.BlocNote;
 import com.itaccess.entity.Bug;
+import com.itaccess.entity.Attendance;
+import com.itaccess.entity.ApkFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.util.List;
+import java.time.LocalDate;
 
 @Slf4j
 @Service
@@ -33,6 +36,8 @@ public class AiService {
     private final BlocNoteRepository blocNoteRepository;
     private final DocumentArchiveRepository documentArchiveRepository;
     private final BugRepository bugRepository;
+    private final AttendanceRepository attendanceRepository;
+    private final ApkFileRepository apkFileRepository;
     private final ObjectMapper objectMapper;
 
     @Value("${app.openai.api-key:}")
@@ -256,6 +261,25 @@ public class AiService {
                 "Retourne la liste globale des bugs déclarés dans le système.",
                 objectMapper.createObjectNode()));
 
+        // 6. Get Attendances
+        ObjectNode attendanceProps = objectMapper.createObjectNode();
+        ObjectNode attDateProp = objectMapper.createObjectNode();
+        attDateProp.put("type", "string");
+        attDateProp.put("description", "La date à interroger (ex: YYYY-MM-DD). Optionnel, par défaut aujourd'hui.");
+        attendanceProps.set("date", attDateProp);
+        ObjectNode attAgentProp = objectMapper.createObjectNode();
+        attAgentProp.put("type", "integer");
+        attAgentProp.put("description", "ID de l'agent spécifique pour filtrer sur les 7 derniers jours (optionnel).");
+        attendanceProps.set("agentId", attAgentProp);
+        tools.add(buildTool("get_attendances",
+                "Retourne la liste des fiches de présence des agents (statut, check-in, check-out) pour un jour ou un agent.",
+                attendanceProps));
+
+        // 7. Get Latest APK Files
+        tools.add(buildTool("get_latest_apk_files",
+                "Retourne la liste des fichiers APK (versions d'applications mobiles) mis en ligne.",
+                objectMapper.createObjectNode()));
+
         return tools;
     }
 
@@ -385,6 +409,8 @@ public class AiService {
                 case "create_bloc_note" -> createBlocNote(argsJson, currentUser);
                 case "create_bug" -> createBug(argsJson, currentUser);
                 case "get_bugs" -> getBugs();
+                case "get_attendances" -> getAttendances(argsJson);
+                case "get_latest_apk_files" -> getLatestApkFiles();
                 default -> "{\"error\": \"Fonction inconnue : " + functionName + "\"}";
             };
         } catch (Exception e) {
@@ -673,6 +699,61 @@ public class AiService {
         ObjectNode result = objectMapper.createObjectNode();
         result.put("total", bugs.size());
         result.set("bugs", objectMapper.valueToTree(bugs));
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String getAttendances(String argsJson) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        LocalDate date = args.has("date") ? LocalDate.parse(args.path("date").asText()) : LocalDate.now();
+        Long agentId = args.has("agentId") ? args.path("agentId").asLong() : null;
+
+        List<Attendance> attendances;
+        if (agentId != null) {
+            attendances = attendanceRepository.findByAgentIdAndDateBetween(agentId, date.minusDays(7), date);
+        } else {
+            attendances = attendanceRepository.findByDate(date);
+        }
+
+        var list = attendances.stream()
+                .map(a -> {
+                    ObjectNode node = objectMapper.createObjectNode();
+                    node.put("id", a.getId());
+                    node.put("agentId", a.getAgentId());
+                    node.put("agentUsername", a.getAgentUsername());
+                    node.put("date", a.getDate().toString());
+                    node.put("statut", a.getStatus());
+                    node.put("arrivee", a.getCheckInTime() != null ? a.getCheckInTime().toString() : "-");
+                    node.put("depart", a.getCheckOutTime() != null ? a.getCheckOutTime().toString() : "-");
+                    node.put("motif", a.getReason() != null ? a.getReason() : "");
+                    return node;
+                })
+                .toList();
+
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("total", list.size());
+        result.set("attendances", objectMapper.valueToTree(list));
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String getLatestApkFiles() throws Exception {
+        var apks = apkFileRepository.findAll().stream()
+                .limit(20)
+                .map(a -> {
+                    ObjectNode node = objectMapper.createObjectNode();
+                    node.put("id", a.getId());
+                    node.put("nom_fichier", a.getOriginalFileName());
+                    node.put("taille", a.getFileSize());
+                    node.put("version", a.getVersion());
+                    node.put("nom_paquet", a.getPackageName());
+                    node.put("date_telechargement", a.getUploadDate() != null ? a.getUploadDate().toString() : "-");
+                    node.put("description", a.getDescription() != null ? a.getDescription() : "");
+                    return node;
+                })
+                .toList();
+
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("total", apks.size());
+        result.set("apk_files", objectMapper.valueToTree(apks));
         return objectMapper.writeValueAsString(result);
     }
 }
