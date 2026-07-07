@@ -35,16 +35,7 @@ public class AiService {
     private final BugRepository bugRepository;
     private final AttendanceRepository attendanceRepository;
     private final ApkFileRepository apkFileRepository;
-    private final MessageRepository messageRepository;
-    private final SystemNotificationRepository systemNotificationRepository;
-    private final ReportGenerationRepository reportGenerationRepository;
-    private final HabilitationRepository habilitationRepository;
     private final ObjectMapper objectMapper;
-
-    private final MessageService messageService;
-    private final SystemNotificationService systemNotificationService;
-    private final ReportService reportService;
-    private final HabilitationService habilitationService;
 
     @Value("${app.openai.api-key:}")
     private String openAiApiKey;
@@ -179,6 +170,10 @@ public class AiService {
 
         tools.add(buildTool("get_test_sessions",
                 "Retourne la liste des sessions de test avec leur statut et nombre de tests.",
+                objectMapper.createObjectNode()));
+
+        tools.add(buildTool("get_test_cases",
+                "Retourne la liste des scénarios de test (test cases) avec leurs étapes.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_tests",
@@ -360,63 +355,6 @@ public class AiService {
                 "Crée une nouvelle session de test.",
                 createTestSessionProps));
 
-        ObjectNode messageProps = objectMapper.createObjectNode();
-        ObjectNode otherUserIdProp = objectMapper.createObjectNode();
-        otherUserIdProp.put("type", "integer");
-        otherUserIdProp.put("description", "ID de l'autre utilisateur pour une conversation (optionnel).");
-        messageProps.set("userId", otherUserIdProp);
-        tools.add(buildTool("get_messages",
-                "Retourne les messages non lus ou une conversation selon le paramètre userId.",
-                messageProps));
-
-        ObjectNode sendMsgProps = objectMapper.createObjectNode();
-        ObjectNode receiverIdProp = objectMapper.createObjectNode();
-        receiverIdProp.put("type", "integer");
-        receiverIdProp.put("description", "ID du destinataire (obligatoire).");
-        sendMsgProps.set("receiverId", receiverIdProp);
-        ObjectNode contentProp = objectMapper.createObjectNode();
-        contentProp.put("type", "string");
-        contentProp.put("description", "Contenu du message (obligatoire).");
-        sendMsgProps.set("content", contentProp);
-        tools.add(buildTool("send_message",
-                "Envoie un message interne à un autre utilisateur.",
-                sendMsgProps));
-
-        ObjectNode notifProps = objectMapper.createObjectNode();
-        ObjectNode notifTypeProp = objectMapper.createObjectNode();
-        notifTypeProp.put("type", "string");
-        notifTypeProp.put("description", "Filtrer par type : INFO, WARNING, ERROR. Optionnel.");
-        notifProps.set("type", notifTypeProp);
-        tools.add(buildTool("get_notifications",
-                "Retourne les notifications de l'utilisateur connecté.",
-                notifProps));
-
-        tools.add(buildTool("get_unread_notifications_count",
-                "Retourne le nombre de notifications non lues pour l'utilisateur connecté.",
-                objectMapper.createObjectNode()));
-
-        ObjectNode reportProps = objectMapper.createObjectNode();
-        ObjectNode reportTypeProp = objectMapper.createObjectNode();
-        reportTypeProp.put("type", "string");
-        reportTypeProp.put("description", "Type de rapport : 'SECURITY', 'ACCESS', 'TESTS', 'PERFORMANCE', 'COMPLIANCE'.");
-        reportProps.set("reportType", reportTypeProp);
-        tools.add(buildTool("generate_report",
-                "Génère un rapport du type spécifié.",
-                reportProps));
-
-        tools.add(buildTool("get_habilitations",
-                "Retourne la liste des habilitations (permissions) des comptes d'accès.",
-                objectMapper.createObjectNode()));
-
-        ObjectNode searchProps = objectMapper.createObjectNode();
-        ObjectNode queryProp = objectMapper.createObjectNode();
-        queryProp.put("type", "string");
-        queryProp.put("description", "Terme de recherche.");
-        searchProps.set("query", queryProp);
-        tools.add(buildTool("search",
-                "Recherche plein texte dans les entités métier.",
-                searchProps));
-
         return tools;
     }
 
@@ -431,7 +369,7 @@ public class AiService {
         parameters.set("properties", properties);
         function.set("parameters", parameters);
 
-        tool.put("type", "function");
+        tool.set("type", "function");
         tool.set("function", function);
         return tool;
     }
@@ -538,6 +476,7 @@ public class AiService {
                 case "get_comptes" -> getComptes();
                 case "get_todos" -> getTodos(argsJson);
                 case "get_test_sessions" -> getTestSessions();
+                case "get_test_cases" -> getTestCases();
                 case "get_tests" -> getTests(argsJson);
                 case "get_bloc_notes" -> getBlocNotes();
                 case "get_documents" -> getDocuments();
@@ -554,13 +493,6 @@ public class AiService {
                 case "update_bug" -> updateBug(argsJson, currentUser);
                 case "update_test_status" -> updateTestStatus(argsJson, currentUser);
                 case "create_test_session" -> createTestSession(argsJson, currentUser);
-                case "get_messages" -> getMessages(argsJson, currentUser);
-                case "send_message" -> sendMessage(argsJson, currentUser);
-                case "get_notifications" -> getNotifications(currentUser);
-                case "get_unread_notifications_count" -> getUnreadNotificationsCount(currentUser);
-                case "generate_report" -> generateReport(argsJson, currentUser);
-                case "get_habilitations" -> getHabilitations();
-                case "search" -> search(argsJson);
                 default -> "{\"error\": \"Fonction inconnue : " + functionName + "\"}";
             };
         } catch (Exception e) {
@@ -576,6 +508,7 @@ public class AiService {
         ObjectNode node = objectMapper.createObjectNode();
         node.put("id", currentUser.getId());
         node.put("username", currentUser.getUsername());
+        node.put("email", currentUser.getEmail());
         node.put("role", currentUser.getRole());
         return objectMapper.writeValueAsString(node);
     }
@@ -706,6 +639,24 @@ public class AiService {
         ObjectNode result = objectMapper.createObjectNode();
         result.put("total", sessions.size());
         result.set("sessions", objectMapper.valueToTree(sessions));
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String getTestCases() throws Exception {
+        var cases = testCaseRepository.findAll().stream()
+                .limit(50)
+                .map(tc -> {
+                    ObjectNode node = objectMapper.createObjectNode();
+                    node.put("id", tc.getId());
+                    node.put("titre", tc.getTitle());
+                    node.put("application_id", tc.getApplicationId());
+                    node.put("etapes", tc.getSteps() != null ? tc.getSteps().size() : 0);
+                    return node;
+                })
+                .toList();
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("total", cases.size());
+        result.set("test_cases", objectMapper.valueToTree(cases));
         return objectMapper.writeValueAsString(result);
     }
 
@@ -1079,192 +1030,5 @@ public class AiService {
         result.put("nom", saved.getNom());
         return objectMapper.writeValueAsString(result);
     }
-
-    private String getMessages(String argsJson, UserInfo currentUser) throws Exception {
-        if (currentUser == null) return "[]";
-        JsonNode args = objectMapper.readTree(argsJson);
-        Long otherUserId = args.has("userId") ? args.path("userId").asLong() : null;
-
-        List<Message> messages;
-        if (otherUserId != null) {
-            messages = messageRepository.findBySenderIdAndReceiverIdOrReceiverIdAndSenderIdOrderByTimestampAsc(
-                    currentUser.getId(), otherUserId, currentUser.getId(), otherUserId);
-        } else {
-            messages = messageRepository.findByReceiverIdAndReadFalse(currentUser.getId());
-            messages.sort((a, b) -> b.getTimestamp().compareTo(a.getTimestamp()));
-        }
-
-        var list = messages.stream()
-                .limit(30)
-                .map(m -> {
-                    ObjectNode node = objectMapper.createObjectNode();
-                    node.put("id", m.getId());
-                    node.put("sender_id", m.getSenderId());
-                    node.put("sender_username", m.getSenderUsername());
-                    node.put("receiver_id", m.getReceiverId());
-                    node.put("contenu", m.getContent());
-                    node.put("lu", m.getRead());
-                    node.put("date", m.getTimestamp() != null ? m.getTimestamp().toString() : "");
-                    return node;
-                })
-                .toList();
-        return objectMapper.writeValueAsString(list);
-    }
-
-    private String sendMessage(String argsJson, UserInfo currentUser) throws Exception {
-        if (currentUser == null) return "{\"error\": \"Utilisateur non connecté\"}";
-        JsonNode args = objectMapper.readTree(argsJson);
-        Long receiverId = args.path("receiverId").asLong();
-        String content = args.path("content").asText(null);
-        if (content == null || content.isBlank()) return "{\"error\": \"Le contenu du message est obligatoire\"}";
-
-        User receiver = userRepository.findById(receiverId)
-                .orElseThrow(() -> new ResourceNotFoundException("Destinataire non trouvé"));
-
-        Message message = Message.builder()
-                .senderId(currentUser.getId())
-                .senderUsername(currentUser.getUsername())
-                .receiverId(receiverId)
-                .receiverUsername(receiver.getUsername())
-                .content(content)
-                .read(false)
-                .build();
-
-        Message saved = messageRepository.save(message);
-        ObjectNode result = objectMapper.createObjectNode();
-        result.put("success", true);
-        result.put("message", "Message envoyé");
-        result.put("id", saved.getId());
-        result.put("senderUsername", saved.getSenderUsername());
-        result.put("receiverUsername", saved.getReceiverUsername());
-        return objectMapper.writeValueAsString(result);
-    }
-
-    private String getNotifications(UserInfo currentUser) throws Exception {
-        if (currentUser == null) return "[]";
-        var notifs = systemNotificationRepository.findAllByUserIdOrderByCreatedAtDesc(currentUser.getId()).stream()
-                .limit(20)
-                .map(n -> {
-                    ObjectNode node = objectMapper.createObjectNode();
-                    node.put("id", n.getId());
-                    node.put("titre", n.getTitle());
-                    node.put("message", n.getMessage());
-                    node.put("type", n.getType().name());
-                    node.put("lu", n.getRead());
-                    node.put("date", n.getCreatedAt() != null ? n.getCreatedAt().toString() : "");
-                    return node;
-                })
-                .toList();
-        return objectMapper.writeValueAsString(notifs);
-    }
-
-    private String getUnreadNotificationsCount(UserInfo currentUser) throws Exception {
-        if (currentUser == null) return "{\"count\": 0}";
-        long count = systemNotificationRepository.countUnreadByUserId(currentUser.getId());
-        ObjectNode result = objectMapper.createObjectNode();
-        result.put("count", count);
-        return objectMapper.writeValueAsString(result);
-    }
-
-    private String getHabilitations() throws Exception {
-        var habilitations = habilitationRepository.findAll().stream()
-                .limit(50)
-                .map(h -> {
-                    ObjectNode node = objectMapper.createObjectNode();
-                    node.put("id", h.getId());
-                    node.put("compteId", h.getCompteId());
-                    node.put("permission", h.getPermission());
-                    return node;
-                })
-                .toList();
-        ObjectNode result = objectMapper.createObjectNode();
-        result.put("total", habilitations.size());
-        result.set("habilitations", objectMapper.valueToTree(habilitations));
-        return objectMapper.writeValueAsString(result);
-    }
-
-    private String search(String argsJson) throws Exception {
-        JsonNode args = objectMapper.readTree(argsJson);
-        String query = args.path("query").asText(null);
-        if (query == null || query.isBlank()) return "{\"error\": \"La requête de recherche est obligatoire.\"}";
-        String lower = query.toLowerCase();
-        List<ObjectNode> results = new ArrayList<>();
-
-        todoRepository.findAll().stream().limit(20).forEach(t -> {
-            if ((t.getTitle() != null && t.getTitle().toLowerCase().contains(lower)) ||
-                (t.getDescription() != null && t.getDescription().toLowerCase().contains(lower))) {
-                ObjectNode node = objectMapper.createObjectNode();
-                node.put("type", "todo");
-                node.put("id", t.getId());
-                node.put("titre", t.getTitle());
-                node.put("priorite", t.getPriority());
-                node.put("termine", t.getCompleted() != null && t.getCompleted());
-                results.add(node);
-            }
-        });
-
-        blocNoteRepository.findAll().stream().limit(20).forEach(n -> {
-            if ((n.getTitle() != null && n.getTitle().toLowerCase().contains(lower)) ||
-                (n.getContent() != null && n.getContent().toLowerCase().contains(lower))) {
-                ObjectNode node = objectMapper.createObjectNode();
-                node.put("type", "bloc_note");
-                node.put("id", n.getId());
-                node.put("titre", n.getTitle());
-                node.put("auteur", n.getCreatedByUsername());
-                node.put("statut", n.getStatus());
-                results.add(node);
-            }
-        });
-
-        bugRepository.findAll().stream().limit(20).forEach(b -> {
-            if ((b.getTitle() != null && b.getTitle().toLowerCase().contains(lower)) ||
-                (b.getReproducibility() != null && b.getReproducibility().toLowerCase().contains(lower))) {
-                ObjectNode node = objectMapper.createObjectNode();
-                node.put("type", "bug");
-                node.put("id", b.getId());
-                node.put("titre", b.getTitle());
-                node.put("gravite", b.getSeverity());
-                node.put("priorite", b.getPriority());
-                node.put("statut", b.getStatus());
-                results.add(node);
-            }
-        });
-
-        testRepository.findAll().stream().limit(20).forEach(t -> {
-            if ((t.getFonction() != null && t.getFonction().toLowerCase().contains(lower)) ||
-                (t.getCommentaires() != null && t.getCommentaires().toLowerCase().contains(lower))) {
-                ObjectNode node = objectMapper.createObjectNode();
-                node.put("type", "test");
-                node.put("id", t.getId());
-                node.put("fonction", t.getFonction());
-                node.put("statut", t.getStatut());
-                node.put("sessionId", t.getSessionId());
-                results.add(node);
-            }
-        });
-
-        ObjectNode result = objectMapper.createObjectNode();
-        result.put("query", lower);
-        result.put("total", results.size());
-        result.set("results", objectMapper.valueToTree(results));
-        return objectMapper.writeValueAsString(result);
-    }
-
-    private String generateReport(String argsJson, UserInfo currentUser) throws Exception {
-        if (currentUser == null) return "{\"error\": \"Utilisateur non connecté\"}";
-        JsonNode args = objectMapper.readTree(argsJson);
-        String typeId = args.path("reportType").asText(null);
-        if (typeId == null || typeId.isBlank()) return "{\"error\": \"Le type de rapport est obligatoire.\"}";
-
-        com.itaccess.dto.ReportGenerationDTO report = reportService.generate(typeId, currentUser);
-        ObjectNode result = objectMapper.createObjectNode();
-        result.put("success", true);
-        result.put("id", report.getId());
-        result.put("title", report.getTitle());
-        result.put("reportType", report.getReportType());
-        result.put("status", report.getStatus());
-        result.put("generatedAt", report.getGeneratedAt() != null ? report.getGeneratedAt().toString() : null);
-        result.put("generatedByUsername", report.getGeneratedByUsername());
-        return objectMapper.writeValueAsString(result);
-    }
 }
+"
