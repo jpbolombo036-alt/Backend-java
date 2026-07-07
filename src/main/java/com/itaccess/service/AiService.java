@@ -15,9 +15,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.*;
 import java.time.LocalDate;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Slf4j
 @Service
@@ -71,6 +75,49 @@ public class AiService {
             - Format Markdown autorisé : listes, gras, code court.
             """;
 
+    private static final int MAX_RETRIES = 2;
+    private static final long BASE_BACKOFF_MS = 2000;
+    private static final long MAX_BACKOFF_MS = 60000;
+    private static final long DEFAULT_QUOTA_WAIT_SECONDS = 60;
+    private static final Pattern RETRY_DELAY_PATTERN = Pattern.compile("retryDelay[\"\\s:]*(\\d+)s", Pattern.CASE_INSENSITIVE);
+    private static final Set<String> GREETING_TOKENS = Set.of(
+            "bonjour", "salut", "hello", "coucou", "hey", "bonsoir", "merci", "ok",
+            "d'accord", "super", "au revoir", "ça", "ca", "va", "bien", "oui", "non", "ouais");
+
+    private static final Map<String, List<String>> TOOL_KEYWORDS = new HashMap<>();
+    static {
+        TOOL_KEYWORDS.put("get_dashboard_stats", List.of("statistique", "dashboard", "tableau de bord", "résumé", "global", "vue d'ensemble", "combien", "aperçu"));
+        TOOL_KEYWORDS.put("get_users", List.of("utilisateur", "admin", "liste des users", "qui est", "rôles", "comptes utilisateurs", "profils"));
+        TOOL_KEYWORDS.put("get_applications", List.of("application", "apps", "logiciel", "appli"));
+        TOOL_KEYWORDS.put("get_comptes", List.of("compte", "accès", "identifiant", "connexion"));
+        TOOL_KEYWORDS.put("get_todos", List.of("tâche", "todo", "tâche à faire", "mes tâches", "à faire"));
+        TOOL_KEYWORDS.put("get_test_sessions", List.of("session de test", "campagne", "test session", "campagnes"));
+        TOOL_KEYWORDS.put("get_tests", List.of("résultat de test", "étapes de test", "tests", "défauts"));
+        TOOL_KEYWORDS.put("get_bloc_notes", List.of("note", "bloc-note", "bloc note", "notes"));
+        TOOL_KEYWORDS.put("get_documents", List.of("document", "archive", "fichier stocké", "docs"));
+        TOOL_KEYWORDS.put("get_bugs", List.of("bug", "anomalie", "problème", "défaut", "bugs"));
+        TOOL_KEYWORDS.put("get_attendances", List.of("présence", "pointage", "absence", "retard", "présences"));
+        TOOL_KEYWORDS.put("get_attendances_stats", List.of("statistique de présence", "taux de présence", "pointages"));
+        TOOL_KEYWORDS.put("get_latest_apk_files", List.of("apk", "android", "version mobile"));
+        TOOL_KEYWORDS.put("create_todo", List.of("créer une tâche", "nouvelle tâche", "ajouter un todo", "ajouter une tâche", "créer un todo"));
+        TOOL_KEYWORDS.put("toggle_todo_complete", List.of("terminer la tâche", "valider la tâche", "marquer comme terminé", "tâche faite", "cocher la tâche"));
+        TOOL_KEYWORDS.put("update_todo", List.of("modifier la tâche", "changer le titre", "décaler la date", "mettre à jour la tâche", "éditer la tâche"));
+        TOOL_KEYWORDS.put("delete_todo", List.of("supprimer la tâche", "effacer le todo", "retirer la tâche"));
+        TOOL_KEYWORDS.put("create_bloc_note", List.of("créer une note", "nouvelle note", "ajouter une note"));
+        TOOL_KEYWORDS.put("create_bug", List.of("déclarer un bug", "signaler un problème", "déclarer une anomalie", "créer un bug"));
+        TOOL_KEYWORDS.put("update_bug", List.of("fermer le bug", "résoudre le bug", "modifier le bug", "statut du bug"));
+        TOOL_KEYWORDS.put("update_test_status", List.of("modifier le statut du test", "changer le statut", "statut du test"));
+        TOOL_KEYWORDS.put("create_test_session", List.of("créer une session de test", "lancer des tests", "nouvelle campagne", "démarrer une session"));
+        TOOL_KEYWORDS.put("get_messages", List.of("message", "messagerie", "conversation", "messages"));
+        TOOL_KEYWORDS.put("send_message", List.of("envoyer un message", "contacter", "message interne", "envoyer un msg"));
+        TOOL_KEYWORDS.put("get_notifications", List.of("notification", "alerte", "notifications"));
+        TOOL_KEYWORDS.put("get_unread_notifications_count", List.of("combien de notification", "alertes en attente", "non lues", "notifications non lues"));
+        TOOL_KEYWORDS.put("generate_report", List.of("rapport", "report", "générer un rapport"));
+        TOOL_KEYWORDS.put("get_habilitations", List.of("habilitation", "permission", "droits d'accès", "permissions"));
+        TOOL_KEYWORDS.put("search", List.of("recherche", "cherche", "trouve", "rechercher"));
+        TOOL_KEYWORDS.put("search_documents", List.of("rechercher dans les documents", "recherche document", "rechercher les documents"));
+    }
+
     public AiChatResponse chat(List<AiChatRequest.AiMessage> messages, UserInfo currentUser) {
         if (openAiApiKey == null || openAiApiKey.isBlank()) {
             return AiChatResponse.builder()
@@ -79,22 +126,37 @@ public class AiService {
                     .build();
         }
 
+        RestClient restClient = RestClient.create();
+        String lastUserMessage = extractLastUserMessage(messages);
+        Set<String> allowedTools = selectToolNames(lastUserMessage);
+        String userId = currentUser != null ? String.valueOf(currentUser.getId()) : "anon";
+
         try {
-            RestClient restClient = RestClient.create();
-            ObjectNode requestBody = buildRequestBody(messages, currentUser);
-
-            String responseJson = restClient.post()
-                    .uri(openAiUrl)
-                    .header("Authorization", "Bearer " + openAiApiKey)
-                    .header("Content-Type", "application/json")
-                    .body(requestBody.toString())
-                    .retrieve()
-                    .body(String.class);
-
+            ObjectNode requestBody = buildRequestBody(messages, currentUser, allowedTools);
+            String responseJson = postWithRetry(restClient, requestBody, userId);
             return processOpenAiResponse(responseJson, messages, restClient, currentUser);
 
+        } catch (AiCallException e) {
+            if (e.statusCode == 429 || (e.statusCode >= 500 && e.statusCode < 600)) {
+                long wait = (e.retryDelaySeconds != null) ? e.retryDelaySeconds : DEFAULT_QUOTA_WAIT_SECONDS;
+                log.warn("Quota/erreur IA épuisé model={} userId={} status={} retryDelay={}s -> réponse dégradée",
+                        openAiModel, userId, e.statusCode, e.retryDelaySeconds);
+                if (e.statusCode == 429) {
+                    return buildDegradedResponse(
+                            "⚠️ Le quota de l'assistant IA est temporairement atteint (limite gratuite Gemini). "
+                                    + "Réessayez dans environ " + wait + " secondes.", wait, currentUser);
+                }
+                return buildDegradedResponse(
+                        "Le service IA est temporairement indisponible (erreur " + e.statusCode
+                                + "). Réessayez dans quelques instants.", wait, currentUser);
+            }
+            log.error("Erreur lors de l'appel à l'IA model={} userId={} status={}", openAiModel, userId, e.statusCode, e);
+            return AiChatResponse.builder()
+                    .error(true)
+                    .errorMessage("Erreur lors de la communication avec l'IA : " + e.getMessage())
+                    .build();
         } catch (Exception e) {
-            log.error("Erreur lors de l'appel à OpenAI", e);
+            log.error("Erreur inattendue lors de l'appel à l'IA model={} userId={}", openAiModel, userId, e);
             return AiChatResponse.builder()
                     .error(true)
                     .errorMessage("Erreur lors de la communication avec l'IA : " + e.getMessage())
@@ -102,7 +164,7 @@ public class AiService {
         }
     }
 
-    private ObjectNode buildRequestBody(List<AiChatRequest.AiMessage> messages, UserInfo currentUser) {
+    private ObjectNode buildRequestBody(List<AiChatRequest.AiMessage> messages, UserInfo currentUser, Set<String> allowedTools) {
         ObjectNode body = objectMapper.createObjectNode();
         body.put("model", openAiModel);
         body.put("max_tokens", maxTokens);
@@ -129,10 +191,181 @@ public class AiService {
         }
         body.set("messages", messagesArray);
 
-        body.set("tools", buildTools());
-        body.put("tool_choice", "auto");
+        ArrayNode tools = selectTools(buildTools(), allowedTools);
+        if (tools.size() > 0) {
+            body.set("tools", tools);
+            body.put("tool_choice", "auto");
+        }
 
         return body;
+    }
+
+    private ArrayNode selectTools(ArrayNode all, Set<String> allowed) {
+        if (allowed == null || allowed.isEmpty()) return objectMapper.createArrayNode();
+        ArrayNode out = objectMapper.createArrayNode();
+        for (JsonNode tool : all) {
+            String name = tool.path("function").path("name").asText();
+            if (allowed.contains(name)) out.add(tool);
+        }
+        return out;
+    }
+
+    private String extractLastUserMessage(List<AiChatRequest.AiMessage> messages) {
+        if (messages == null) return "";
+        for (int i = messages.size() - 1; i >= 0; i--) {
+            AiChatRequest.AiMessage m = messages.get(i);
+            if ("user".equalsIgnoreCase(m.getRole()) && m.getContent() != null) {
+                return m.getContent();
+            }
+        }
+        return "";
+    }
+
+    private Set<String> selectToolNames(String message) {
+        if (message == null || message.isBlank()) return Set.of();
+        String lower = message.toLowerCase();
+        if (isGreetingOnly(lower)) return Set.of();
+
+        Set<String> selected = new HashSet<>();
+        selected.add("get_current_user");
+        selected.add("get_user_context");
+        selected.add("get_dashboard_stats");
+        for (Map.Entry<String, List<String>> entry : TOOL_KEYWORDS.entrySet()) {
+            for (String kw : entry.getValue()) {
+                if (lower.contains(kw)) {
+                    selected.add(entry.getKey());
+                    break;
+                }
+            }
+        }
+        return selected;
+    }
+
+    private boolean isGreetingOnly(String lower) {
+        String[] words = lower.split("\\W+");
+        if (words.length == 0) return true;
+        for (String w : words) {
+            if (!GREETING_TOKENS.contains(w)) return false;
+        }
+        return true;
+    }
+
+    private AiChatResponse buildDegradedResponse(String intro, long wait, UserInfo currentUser) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(intro).append("\n\n");
+        sb.append("En attendant, voici un aperçu disponible sans appel à l'IA :\n\n");
+        try {
+            sb.append(formatDashboardStatsForFallback());
+            if (currentUser != null) {
+                sb.append("\nConnecté en tant que **").append(currentUser.getUsername())
+                        .append("** (rôle : ").append(currentUser.getRole()).append(").");
+            }
+        } catch (Exception ex) {
+            sb.append("_Données indisponibles._");
+        }
+        return AiChatResponse.builder()
+                .error(true)
+                .errorMessage("Assistant IA temporairement indisponible, réessayez dans environ " + wait + " secondes.")
+                .reply(sb.toString())
+                .model(openAiModel)
+                .build();
+    }
+
+    private String formatDashboardStatsForFallback() throws Exception {
+        JsonNode stats = objectMapper.readTree(getDashboardStats());
+        StringBuilder sb = new StringBuilder();
+        sb.append("- Utilisateurs : ").append(stats.path("total_utilisateurs").asInt()).append("\n");
+        sb.append("- Applications : ").append(stats.path("total_applications").asInt()).append("\n");
+        sb.append("- Comptes : ").append(stats.path("total_comptes").asInt()).append("\n");
+        sb.append("- Tâches : ").append(stats.path("total_taches").asInt()).append("\n");
+        sb.append("- Sessions de test : ").append(stats.path("total_sessions_test").asInt()).append("\n");
+        sb.append("- Tests : ").append(stats.path("total_tests").asInt()).append("\n");
+        sb.append("- Bugs : ").append(stats.path("total_bugs").asInt()).append("\n");
+        sb.append("- Documents : ").append(stats.path("total_documents").asInt()).append("\n");
+        return sb.toString();
+    }
+
+    private String postWithRetry(RestClient restClient, ObjectNode body, String userId) throws AiCallException {
+        int attempt = 0;
+        long backoff = BASE_BACKOFF_MS;
+        while (true) {
+            try {
+                return restClient.post()
+                        .uri(openAiUrl)
+                        .header("Authorization", "Bearer " + openAiApiKey)
+                        .header("Content-Type", "application/json")
+                        .body(body.toString())
+                        .retrieve()
+                        .body(String.class);
+            } catch (RestClientResponseException ex) {
+                int code = ex.getStatusCode().value();
+                String respBody = ex.getResponseBodyAsString();
+                Long retryDelay = parseRetryDelay(respBody);
+                boolean retriable = code == 429 || (code >= 500 && code < 600);
+                if (retriable && attempt < MAX_RETRIES) {
+                    long waitMs = Math.min((retryDelay != null ? retryDelay * 1000 : backoff), MAX_BACKOFF_MS);
+                    log.warn("Appel IA en échec (status={}) model={} userId={} retryDelay={}s -> nouvel essai {} dans {}ms",
+                            code, openAiModel, userId, retryDelay, (attempt + 1), waitMs);
+                    sleepQuietly(waitMs);
+                    backoff *= 2;
+                    attempt++;
+                    continue;
+                }
+                throw new AiCallException("Le fournisseur IA a répondu avec le statut " + code, code, respBody, retryDelay);
+            } catch (RestClientException ex) {
+                if (attempt < MAX_RETRIES) {
+                    log.warn("Erreur réseau lors de l'appel IA model={} userId={} -> nouvel essai {} dans {}ms",
+                            openAiModel, userId, (attempt + 1), backoff);
+                    sleepQuietly(backoff);
+                    backoff *= 2;
+                    attempt++;
+                    continue;
+                }
+                throw new AiCallException("Erreur réseau lors de l'appel à l'IA : " + ex.getMessage(), 0, null, null);
+            }
+        }
+    }
+
+    private void sleepQuietly(long millis) {
+        try {
+            Thread.sleep(millis);
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private Long parseRetryDelay(String body) {
+        if (body == null || body.isBlank()) return null;
+        try {
+            JsonNode root = objectMapper.readTree(body);
+            JsonNode error = root.path("error");
+            if (!error.isMissingNode()) {
+                String msg = error.path("message").asText("");
+                Matcher m = RETRY_DELAY_PATTERN.matcher(msg);
+                if (m.find()) return Long.parseLong(m.group(1));
+            }
+            JsonNode content = root.path("choices").path(0).path("message").path("content");
+            if (!content.isMissingNode()) {
+                Matcher m = RETRY_DELAY_PATTERN.matcher(content.asText());
+                if (m.find()) return Long.parseLong(m.group(1));
+            }
+        } catch (Exception e) {
+            return null;
+        }
+        return null;
+    }
+
+    private static class AiCallException extends Exception {
+        final int statusCode;
+        final String body;
+        final Long retryDelaySeconds;
+
+        AiCallException(String message, int statusCode, String body, Long retryDelaySeconds) {
+            super(message);
+            this.statusCode = statusCode;
+            this.body = body;
+            this.retryDelaySeconds = retryDelaySeconds;
+        }
     }
 
     private ArrayNode buildTools() {
@@ -506,13 +739,19 @@ public class AiService {
         body.put("max_tokens", maxTokens);
         body.set("messages", newMessages);
 
-        String finalResponseJson = restClient.post()
-                .uri(openAiUrl)
-                .header("Authorization", "Bearer " + openAiApiKey)
-                .header("Content-Type", "application/json")
-                .body(body.toString())
-                .retrieve()
-                .body(String.class);
+        String finalResponseJson;
+        try {
+            finalResponseJson = postWithRetry(restClient, body,
+                    currentUser != null ? String.valueOf(currentUser.getId()) : "anon");
+        } catch (AiCallException ex) {
+            long wait = (ex.retryDelaySeconds != null) ? ex.retryDelaySeconds : DEFAULT_QUOTA_WAIT_SECONDS;
+            log.warn("Échec après appels aux outils model={} status={} retryDelay={}s -> réponse dégradée",
+                    openAiModel, ex.statusCode, ex.retryDelaySeconds);
+            return buildDegradedResponse(
+                    "J'ai récupéré des données via les outils métier, mais le service IA est indisponible pour "
+                            + "finaliser la réponse (erreur " + ex.statusCode + "). Réessayez dans environ "
+                            + wait + " secondes.", wait, currentUser);
+        }
 
         JsonNode finalRoot = objectMapper.readTree(finalResponseJson);
         String reply = finalRoot.path("choices").path(0).path("message").path("content")
