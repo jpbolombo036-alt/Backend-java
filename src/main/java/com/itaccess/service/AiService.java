@@ -60,25 +60,15 @@ public class AiService {
 
     private static final String SYSTEM_PROMPT = """
             Tu es l'assistant IA de **IT Access Manager**, une application de gestion des accès IT.
-            Tu aides les utilisateurs à naviguer dans l'application, comprendre les données et répondre à leurs questions.
+            Tu aides les utilisateurs à naviguer, comprendre les données et répondre à leurs questions.
             
-            Tu as accès à des fonctions pour récupérer des données en temps réel :
-            - Utilisateurs (liste, nombre, rôles)
-            - Applications IT gérées
-            - Comptes d'accès par application
-            - Tâches (todos)
-            - Sessions de test et étapes de test
-            - Bloc-notes
-            - Documents archivés
-            - Bugs déclarés
-            - Présences des agents
-            - Fichiers APK
-            
-            Règles importantes :
-            - Réponds TOUJOURS en français
-            - Sois concis, professionnel et bienveillant
-            - Si tu n'as pas accès à une donnée, dis-le clairement
-            - Utilise les fonctions disponibles pour répondre avec des données réelles
+            Comportement :
+            - Réponds TOUJOURS en français, sur un ton professionnel et concis.
+            - Si la question est mal orthographiée ou ambiguë, reformule-la mentalement et réponds à la demande la plus probable.
+            - Ne jamais inventer de données : si tu n'as pas accès à une information, dis-le clairement.
+            - Vérifie toujours la cohérence avec le rôle et les droits de l'utilisateur connecté.
+            - Si une action nécessite des droits admin, infirme calmement et propose l'alternative de lecture seule.
+            - Format Markdown autorisé : listes, gras, code court.
             """;
 
     public AiChatResponse chat(List<AiChatRequest.AiMessage> messages, UserInfo currentUser) {
@@ -153,19 +143,19 @@ public class AiService {
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_current_user",
-                "Retourne les informations de l'utilisateur connecté (id, username, role, email).",
+                "Retourne les informations de l'utilisateur connecté : id, username, role. Utilise cet outil quand la question concerne 'moi', 'mon compte', 'mes droits' ou l'identité de l'utilisateur.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_users",
-                "Retourne la liste des utilisateurs de l'application avec leur rôle et statut.",
+                "Retourne la liste des utilisateurs de l'application avec leur rôle et statut. Utilise cet outil pour : 'qui est admin ?', 'liste des utilisateurs', 'combien d'utilisateurs ?', 'quels sont les rôles ?'.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_applications",
-                "Retourne la liste des applications IT gérées dans le système.",
+                "Retourne la liste des applications IT gérées dans le système. Utilise cet outil pour : 'quelles applications ?', 'liste des apps', 'applications disponibles'.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_comptes",
-                "Retourne la liste des comptes d'accès associés aux applications.",
+                "Retourne la liste des comptes d'accès associés aux applications. Utilise cet outil pour : 'quels comptes ?', 'accès par application', 'comptes stockés'.",
                 objectMapper.createObjectNode()));
 
         ObjectNode todoProps = objectMapper.createObjectNode();
@@ -174,27 +164,27 @@ public class AiService {
         statusProp.put("description", "Filtrer par statut : 'all', 'done', 'pending'. Par défaut 'all'.");
         todoProps.set("status", statusProp);
         tools.add(buildTool("get_todos",
-                "Retourne la liste des tâches (todos) du système.",
+                "Retourne la liste des tâches (todos) du système. Utilise cet outil pour : 'mes tâches', 'tâches en cours', 'tâches terminées', 'todo list'.",
                 todoProps));
 
         tools.add(buildTool("get_test_sessions",
-                "Retourne la liste des sessions de test avec leur statut et nombre de tests.",
+                "Retourne la liste des sessions de test avec leur statut et nombre de tests. Utilise cet outil pour : 'sessions de test', 'état des tests', 'campagnes de test'.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_tests",
-                "Retourne la liste des étapes de test individuelles (tests exécutés) avec leur statut.",
+                "Retourne la liste des étapes de test individuelles (tests exécutés) avec leur statut. Utilise cet outil pour : 'résultats des tests', 'étapes de test', 'bugs dans les tests'.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_bloc_notes",
-                "Retourne la liste des bloc-notes créés dans l'application.",
+                "Retourne la liste des bloc-notes créés dans l'application. Utilise cet outil pour : 'notes', 'bloc-notes', 'notes publiées', 'notes brouillon'.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_documents",
-                "Retourne la liste des documents archivés dans le système.",
+                "Retourne la liste des documents archivés dans le système. Utilise cet outil pour : 'documents', 'archives', 'fichiers stockés', 'docs'.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_bugs",
-                "Retourne la liste globale des bugs déclarés dans le système.",
+                "Retourne la liste globale des bugs déclarés dans le système. Utilise cet outil pour : 'bugs', 'anomalies', 'problèmes', 'défauts'.",
                 objectMapper.createObjectNode()));
 
         ObjectNode attendanceProps = objectMapper.createObjectNode();
@@ -207,15 +197,15 @@ public class AiService {
         attAgentProp.put("description", "ID de l'agent spécifique pour filtrer sur les 7 derniers jours (optionnel).");
         attendanceProps.set("agentId", attAgentProp);
         tools.add(buildTool("get_attendances",
-                "Retourne la liste des fiches de présence des agents (statut, check-in, check-out) pour un jour ou un agent.",
+                "Retourne la liste des fiches de présence des agents (statut, check-in, check-out) pour un jour ou un agent. Utilise cet outil pour : 'présences', 'pointages', 'absences', 'retards'.",
                 attendanceProps));
 
         tools.add(buildTool("get_attendances_stats",
-                "Retourne les statistiques de présence du jour : total, présents, absents, retards.",
+                "Retourne les statistiques de présence du jour : total, présents, absents, retards. Utilise cet outil pour : 'statistiques de présence', 'taux de présence'.",
                 objectMapper.createObjectNode()));
 
         tools.add(buildTool("get_latest_apk_files",
-                "Retourne la liste des fichiers APK (versions d'applications mobiles) mis en ligne.",
+                "Retourne la liste des fichiers APK (versions d'applications mobiles) mis en ligne. Utilise cet outil pour : 'APK', 'versions mobiles', 'applications Android'.",
                 objectMapper.createObjectNode()));
 
         ObjectNode createTodoProps = objectMapper.createObjectNode();
@@ -236,7 +226,7 @@ public class AiService {
         dueDateProp.put("description", "Date d'échéance de la tâche (ex: YYYY-MM-DD).");
         createTodoProps.set("dueDate", dueDateProp);
         tools.add(buildTool("create_todo",
-                "Crée une nouvelle tâche (todo) pour l'utilisateur connecté.",
+                "Crée une nouvelle tâche (todo) pour l'utilisateur connecté. Utilise cet outil pour : 'créer une tâche', 'nouvelle tâche', 'ajouter un todo'.",
                 createTodoProps));
 
         ObjectNode toggleTodoProps = objectMapper.createObjectNode();
@@ -245,7 +235,7 @@ public class AiService {
         todoIdProp.put("description", "L'ID de la tâche à cocher/décoche (obligatoire).");
         toggleTodoProps.set("id", todoIdProp);
         tools.add(buildTool("toggle_todo_complete",
-                "Bascule le statut d'une tâche (complétée ou non) par son ID.",
+                "Bascule le statut d'une tâche (complétée ou non) par son ID. Utilise cet outil pour : 'marquer comme terminée', 'valider la tâche', 'tache faite'.",
                 toggleTodoProps));
 
         ObjectNode updateTodoProps = objectMapper.createObjectNode();
@@ -267,13 +257,13 @@ public class AiService {
         newDueDateProp.put("description", "Nouvelle date d'échéance (ex: YYYY-MM-DD, optionnel).");
         updateTodoProps.set("dueDate", newDueDateProp);
         tools.add(buildTool("update_todo",
-                "Met à jour une tâche existante par son ID.",
+                "Met à jour une tâche existante par son ID. Utilise cet outil pour : 'modifier la tâche', 'changer le titre', 'décaler la date'.",
                 updateTodoProps));
 
         ObjectNode deleteTodoProps = objectMapper.createObjectNode();
         deleteTodoProps.set("id", todoIdProp);
         tools.add(buildTool("delete_todo",
-                "Supprime une tâche par son ID.",
+                "Supprime une tâche par son ID. Utilise cet outil pour : 'supprimer la tâche', 'effacer le todo'.",
                 deleteTodoProps));
 
         ObjectNode createNoteProps = objectMapper.createObjectNode();
@@ -294,7 +284,7 @@ public class AiService {
         noteAppIdProp.put("description", "ID de l'application associée (optionnel).");
         createNoteProps.set("applicationId", noteAppIdProp);
         tools.add(buildTool("create_bloc_note",
-                "Crée une nouvelle note dans le bloc-notes.",
+                "Crée une nouvelle note dans le bloc-notes. Utilise cet outil pour : 'créer une note', 'nouvelle note', 'bloc-notes'.",
                 createNoteProps));
 
         ObjectNode createBugProps = objectMapper.createObjectNode();
@@ -319,7 +309,7 @@ public class AiService {
         bugStepIdProp.put("description", "ID de l'étape de test (TestStep) liée au bug (optionnel).");
         createBugProps.set("testStepId", bugStepIdProp);
         tools.add(buildTool("create_bug",
-                "Déclare un nouveau bug lié à une anomalie.",
+                "Déclare un nouveau bug lié à une anomalie. Utilise cet outil pour : 'déclarer un bug', 'signaler un problème', 'anomalie'.",
                 createBugProps));
 
         ObjectNode updateBugProps = objectMapper.createObjectNode();
@@ -332,7 +322,7 @@ public class AiService {
         bugStatusProp.put("description", "Nouveau statut : 'OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'.");
         updateBugProps.set("status", bugStatusProp);
         tools.add(buildTool("update_bug",
-                "Met à jour le statut d'un bug existant.",
+                "Met à jour le statut d'un bug existant. Utilise cet outil pour : 'fermer le bug', 'résoudre le bug', 'avancement bug'.",
                 updateBugProps));
 
         ObjectNode createTestSessionProps = objectMapper.createObjectNode();
@@ -357,7 +347,7 @@ public class AiService {
         platformProp.put("description", "Plateforme : 'Web', 'Android', 'iOS'. Par défaut 'Web'.");
         createTestSessionProps.set("plateforme", platformProp);
         tools.add(buildTool("create_test_session",
-                "Crée une nouvelle session de test.",
+                "Crée une nouvelle session de test. Utilise cet outil pour : 'créer une session de test', 'nouvelle campagne', 'lancer des tests'.",
                 createTestSessionProps));
 
         ObjectNode messageProps = objectMapper.createObjectNode();
@@ -366,7 +356,7 @@ public class AiService {
         otherUserIdProp.put("description", "ID de l'autre utilisateur pour une conversation (optionnel).");
         messageProps.set("userId", otherUserIdProp);
         tools.add(buildTool("get_messages",
-                "Retourne les messages non lus ou une conversation selon le paramètre userId.",
+                "Retourne les messages non lus ou une conversation selon le paramètre userId. Utilise cet outil pour : 'messages non lus', 'conversation avec X', 'messagerie'.",
                 messageProps));
 
         ObjectNode sendMsgProps = objectMapper.createObjectNode();
@@ -379,7 +369,7 @@ public class AiService {
         contentProp.put("description", "Contenu du message (obligatoire).");
         sendMsgProps.set("content", contentProp);
         tools.add(buildTool("send_message",
-                "Envoie un message interne à un autre utilisateur.",
+                "Envoie un message interne à un autre utilisateur. Utilise cet outil pour : 'envoyer un message', 'contacter X', 'message interne'.",
                 sendMsgProps));
 
         ObjectNode notifProps = objectMapper.createObjectNode();
@@ -388,11 +378,11 @@ public class AiService {
         notifTypeProp.put("description", "Filtrer par type : INFO, WARNING, ERROR. Optionnel.");
         notifProps.set("type", notifTypeProp);
         tools.add(buildTool("get_notifications",
-                "Retourne les notifications de l'utilisateur connecté.",
+                "Retourne les notifications de l'utilisateur connecté. Utilise cet outil pour : 'mes notifications', 'alertes', 'notifications non lues'.",
                 notifProps));
 
         tools.add(buildTool("get_unread_notifications_count",
-                "Retourne le nombre de notifications non lues pour l'utilisateur connecté.",
+                "Retourne le nombre de notifications non lues pour l'utilisateur connecté. Utilise cet outil pour : 'combien de notifications ?', 'alertes en attente'.",
                 objectMapper.createObjectNode()));
 
         ObjectNode reportProps = objectMapper.createObjectNode();
@@ -401,11 +391,11 @@ public class AiService {
         reportTypeProp.put("description", "Type de rapport : 'SECURITY', 'ACCESS', 'TESTS', 'PERFORMANCE', 'COMPLIANCE'.");
         reportProps.set("reportType", reportTypeProp);
         tools.add(buildTool("generate_report",
-                "Génère un rapport du type spécifié.",
+                "Génère un rapport du type spécifié. Utilise cet outil pour : 'générer un rapport', 'rapport de sécurité', 'rapport de tests'.",
                 reportProps));
 
         tools.add(buildTool("get_habilitations",
-                "Retourne la liste des habilitations (permissions) des comptes d'accès.",
+                "Retourne la liste des habilitations (permissions) des comptes d'accès. Utilise cet outil pour : 'habilitations', 'permissions', 'droits d'accès'.",
                 objectMapper.createObjectNode()));
 
         ObjectNode searchProps = objectMapper.createObjectNode();
@@ -415,6 +405,14 @@ public class AiService {
         searchProps.set("query", queryProp);
         tools.add(buildTool("search",
                 "Recherche plein texte dans les entités métier.",
+                searchProps));
+
+        tools.add(buildTool("get_user_context",
+                "Retourne le contexte complet de l'utilisateur connecté : profil, todos assignés, notifications récentes et dernieres actions.",
+                objectMapper.createObjectNode()));
+
+        tools.add(buildTool("search_documents",
+                "Recherche avancée dans les documents et notes par titre, contenu ou auteur.",
                 searchProps));
 
         return tools;
@@ -561,6 +559,8 @@ public class AiService {
                 case "generate_report" -> generateReport(argsJson, currentUser);
                 case "get_habilitations" -> getHabilitations();
                 case "search" -> search(argsJson);
+                case "get_user_context" -> getUserContext(currentUser);
+                case "search_documents" -> searchDocuments(argsJson);
                 default -> "{\"error\": \"Fonction inconnue : " + functionName + "\"}";
             };
         } catch (Exception e) {
@@ -1265,6 +1265,93 @@ public class AiService {
         result.put("status", report.getStatus());
         result.put("generatedAt", report.getGeneratedAt() != null ? report.getGeneratedAt().toString() : null);
         result.put("generatedByUsername", report.getGeneratedByUsername());
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String getUserContext(UserInfo currentUser) throws Exception {
+        if (currentUser == null) return "{\"error\": \"Utilisateur non connecté\"}";
+
+        ObjectNode context = objectMapper.createObjectNode();
+        context.put("id", currentUser.getId());
+        context.put("username", currentUser.getUsername());
+        context.put("role", currentUser.getRole());
+
+        var todos = todoRepository.findAll().stream()
+                .filter(t -> currentUser.getId().equals(t.getCreatedBy()))
+                .limit(10)
+                .map(t -> {
+                    ObjectNode node = objectMapper.createObjectNode();
+                    node.put("id", t.getId());
+                    node.put("titre", t.getTitle());
+                    node.put("termine", t.getCompleted() != null && t.getCompleted());
+                    node.put("priorite", t.getPriority());
+                    node.put("echeance", t.getDueDate());
+                    return node;
+                })
+                .toList();
+        context.set("todos", objectMapper.valueToTree(todos));
+
+        var notifications = systemNotificationRepository.findAllByUserIdOrderByCreatedAtDesc(currentUser.getId()).stream()
+                .limit(10)
+                .map(n -> {
+                    ObjectNode node = objectMapper.createObjectNode();
+                    node.put("id", n.getId());
+                    node.put("titre", n.getTitle());
+                    node.put("message", n.getMessage());
+                    node.put("lu", n.getRead());
+                    node.put("date", n.getCreatedAt() != null ? n.getCreatedAt().toString() : "");
+                    return node;
+                })
+                .toList();
+        context.set("notifications", objectMapper.valueToTree(notifications));
+
+        long unread = systemNotificationRepository.countUnreadByUserId(currentUser.getId());
+        context.put("notifications_non_lues", unread);
+
+        return objectMapper.writeValueAsString(context);
+    }
+
+    private String searchDocuments(String argsJson) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        String query = args.path("query").asText(null);
+        if (query == null || query.isBlank()) return "{\"error\": \"La requête de recherche est obligatoire.\"}";
+        String lower = query.toLowerCase();
+        List<ObjectNode> results = new ArrayList<>();
+
+        documentArchiveRepository.findAll().stream().limit(30).forEach(d -> {
+            boolean match = (d.getTitle() != null && d.getTitle().toLowerCase().contains(lower)) ||
+                            (d.getDescription() != null && d.getDescription().toLowerCase().contains(lower)) ||
+                            (d.getUploadedByUsername() != null && d.getUploadedByUsername().toLowerCase().contains(lower));
+            if (match) {
+                ObjectNode node = objectMapper.createObjectNode();
+                node.put("type", "document");
+                node.put("id", d.getId());
+                node.put("titre", d.getTitle());
+                node.put("categorie", d.getCategory());
+                node.put("auteur", d.getUploadedByUsername());
+                results.add(node);
+            }
+        });
+
+        blocNoteRepository.findAll().stream().limit(30).forEach(n -> {
+            boolean match = (n.getTitle() != null && n.getTitle().toLowerCase().contains(lower)) ||
+                            (n.getContent() != null && n.getContent().toLowerCase().contains(lower)) ||
+                            (n.getCreatedByUsername() != null && n.getCreatedByUsername().toLowerCase().contains(lower));
+            if (match) {
+                ObjectNode node = objectMapper.createObjectNode();
+                node.put("type", "note");
+                node.put("id", n.getId());
+                node.put("titre", n.getTitle());
+                node.put("auteur", n.getCreatedByUsername());
+                node.put("statut", n.getStatus());
+                results.add(node);
+            }
+        });
+
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("query", lower);
+        result.put("total", results.size());
+        result.set("results", objectMapper.valueToTree(results));
         return objectMapper.writeValueAsString(result);
     }
 }
