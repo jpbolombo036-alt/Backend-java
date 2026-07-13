@@ -26,5 +26,6 @@ public class DocumentArchiveDTO {
     private Long uploadedBy;
     private String uploadedByUsername;
     private LocalDateTime uploadDate;
+    private LocalDateTime updateDate;
     private Integer downloadCount;
 }

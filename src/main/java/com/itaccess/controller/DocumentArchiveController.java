@@ -113,13 +113,33 @@ public class DocumentArchiveController {
         return ResponseEntity.ok(documentArchiveService.searchDocuments(q));
     }
 
+    @PutMapping("/{id}")
+    @Operation(summary = "Mettre à jour un document", description = "Met à jour les métadonnées et/ou le binaire d'un document (auteur ou admin)")
+    public ResponseEntity<DocumentArchiveDTO> updateDocument(
+            @PathVariable Long id,
+            @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "description", required = false) String description,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "tags", required = false) String tags,
+            @RequestParam(value = "author", required = false) String author) {
+        try {
+            DocumentArchiveDTO updated = documentArchiveService.updateDocument(id, currentUser.getId(),
+                    currentUser.getRole(), file, title, description, category, tags, author);
+            return ResponseEntity.ok(updated);
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Supprimer un document", description = "Supprime un document de l'archive (propriétaire ou admin uniquement)")
     public ResponseEntity<Void> deleteDocument(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         try {
-            documentArchiveService.deleteDocument(id, currentUser.getId());
+            documentArchiveService.deleteDocument(id, currentUser.getId(), currentUser.getRole());
             return ResponseEntity.noContent().build();
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();

@@ -127,9 +127,15 @@ public class DocumentArchiveService {
         return b2StorageService.downloadAsResource(objectKey, document.getOriginalFileName(), document.getContentType());
     }
 
-    public void deleteDocument(Long id, Long userId) throws IOException {
+    public void deleteDocument(Long id, Long userId, String userRole) throws IOException {
         DocumentArchive document = documentArchiveRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document non trouvé avec l'ID: " + id));
+
+        // Contrôle de propriété : auteur ou administrateur uniquement
+        boolean isAdmin = userRole != null && "admin".equalsIgnoreCase(userRole);
+        if (!isAdmin && !userId.equals(document.getUploadedBy())) {
+            throw new SecurityException("Vous n'êtes pas autorisé à supprimer ce document");
+        }
 
         String objectKey = document.getFilePath();
         if (objectKey == null) {
@@ -141,6 +147,83 @@ public class DocumentArchiveService {
 
         auditService.logAction("DELETE_DOCUMENT", "Document: " + document.getOriginalFileName(), userId);
         log.info("Document deleted: {}", document.getOriginalFileName());
+    }
+
+    /**
+     * Met à jour un document d'archive : métadonnées et/ou remplacement du binaire.
+     * Réservé à l'auteur du document ou à un administrateur.
+     * La date de mise à jour (update_date) est renseignée automatiquement par @PreUpdate.
+     */
+    public DocumentArchiveDTO updateDocument(Long id, Long userId, String userRole,
+                                             MultipartFile file, String title, String description,
+                                             String category, String tags, String author) throws IOException {
+        DocumentArchive document = documentArchiveRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Document non trouvé avec l'ID: " + id));
+
+        boolean isAdmin = userRole != null && "admin".equalsIgnoreCase(userRole);
+        if (!isAdmin && !userId.equals(document.getUploadedBy())) {
+            throw new SecurityException("Vous n'êtes pas autorisé à modifier ce document");
+        }
+
+        // Remplacement éventuel du binaire (PDF/Word uniquement)
+        if (file != null && !file.isEmpty()) {
+            String originalFileName = file.getOriginalFilename();
+            if (originalFileName == null || originalFileName.isBlank()) {
+                throw new IOException("Nom de fichier invalide");
+            }
+
+            String contentType = file.getContentType();
+            String lowerName = originalFileName.toLowerCase();
+            if (contentType == null) {
+                if (lowerName.endsWith(".pdf")) {
+                    contentType = "application/pdf";
+                } else if (lowerName.endsWith(".docx")) {
+                    contentType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+                } else if (lowerName.endsWith(".doc")) {
+                    contentType = "application/msword";
+                }
+            }
+            if (!isSupportedContentType(contentType)) {
+                throw new IOException("Format de fichier non supporté. Seuls PDF et Word (.doc, .docx) sont autorisés.");
+            }
+
+            // Supprime l'ancien binaire avant d'écrire le nouveau
+            String oldKey = document.getFilePath();
+            if (oldKey == null) {
+                oldKey = b2StorageService.buildObjectKey(document.getFileName());
+            }
+            b2StorageService.delete(oldKey);
+
+            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+            String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
+            String objectKey = b2StorageService.upload(file, b2StorageService.buildObjectKey(uniqueFileName), contentType);
+
+            document.setFileName(uniqueFileName);
+            document.setOriginalFileName(originalFileName);
+            document.setFilePath(objectKey);
+            document.setFileSize(file.getSize());
+            document.setContentType(contentType);
+        }
+
+        if (title != null) {
+            document.setTitle(title);
+        }
+        if (description != null) {
+            document.setDescription(description);
+        }
+        if (category != null) {
+            document.setCategory(category);
+        }
+        if (tags != null) {
+            document.setTags(tags);
+        }
+        if (author != null) {
+            document.setAuthor(author);
+        }
+
+        DocumentArchive saved = documentArchiveRepository.save(document); // @PreUpdate renseigne updateDate
+        log.info("Document updated: {}", document.getOriginalFileName());
+        return toDTO(saved);
     }
 
     private boolean isSupportedContentType(String contentType) {
@@ -165,6 +248,7 @@ public class DocumentArchiveService {
                 .uploadedBy(document.getUploadedBy())
                 .uploadedByUsername(document.getUploadedByUsername())
                 .uploadDate(document.getUploadDate())
+                .updateDate(document.getUpdateDate())
                 .downloadCount(document.getDownloadCount())
                 .build();
     }
