@@ -1,5 +1,6 @@
 package com.itaccess.service;
 
+import com.itaccess.config.B2Properties;
 import com.itaccess.dto.DocumentArchiveDTO;
 import com.itaccess.dto.DocumentArchiveRequest;
 import com.itaccess.entity.DocumentArchive;
@@ -7,7 +8,9 @@ import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.DocumentArchiveRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +19,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -28,6 +34,10 @@ public class DocumentArchiveService {
     private final DocumentArchiveRepository documentArchiveRepository;
     private final AuditService auditService;
     private final B2StorageService b2StorageService;
+    private final B2Properties b2Properties;
+
+    @Value("${app.upload.document-archive-dir:uploads/documents}")
+    private String localDocumentDir;
 
     public DocumentArchiveDTO uploadDocument(MultipartFile file, DocumentArchiveRequest request, Long uploadedBy, String username) throws IOException {
         log.info("Starting document archive upload: file={}, size={}, user={}", file.getOriginalFilename(), file.getSize(), uploadedBy);
@@ -59,12 +69,12 @@ public class DocumentArchiveService {
 
         String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
         String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
-        String objectKey = b2StorageService.upload(file, b2StorageService.buildObjectKey(uniqueFileName), contentType);
+        String storageKey = storeFile(file, uniqueFileName, contentType);
 
         DocumentArchive document = DocumentArchive.builder()
                 .fileName(uniqueFileName)
                 .originalFileName(originalFileName)
-                .filePath(objectKey)
+                .filePath(storageKey)
                 .fileSize(file.getSize())
                 .contentType(contentType)
                 .title(request.getTitle())
@@ -117,14 +127,15 @@ public class DocumentArchiveService {
         DocumentArchive document = documentArchiveRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Document non trouvé avec l'ID: " + id));
 
+        // Vérifie l'existence du binaire avant toute mutation (miroir APK)
+        if (!documentExists(document.getFilePath())) {
+            throw new ResourceNotFoundException("Fichier physique non trouvé");
+        }
+
         document.setDownloadCount(document.getDownloadCount() + 1);
         documentArchiveRepository.save(document);
 
-        String objectKey = document.getFilePath();
-        if (objectKey == null) {
-            objectKey = b2StorageService.buildObjectKey(document.getFileName());
-        }
-        return b2StorageService.downloadAsResource(objectKey, document.getOriginalFileName(), document.getContentType());
+        return loadDocumentResource(document.getFilePath(), document.getOriginalFileName(), document.getContentType());
     }
 
     public void deleteDocument(Long id, Long userId, String userRole) throws IOException {
@@ -137,11 +148,7 @@ public class DocumentArchiveService {
             throw new SecurityException("Vous n'êtes pas autorisé à supprimer ce document");
         }
 
-        String objectKey = document.getFilePath();
-        if (objectKey == null) {
-            objectKey = b2StorageService.buildObjectKey(document.getFileName());
-        }
-        b2StorageService.delete(objectKey);
+        deleteStoredFile(document.getFilePath());
 
         documentArchiveRepository.delete(document);
 
@@ -187,20 +194,15 @@ public class DocumentArchiveService {
                 throw new IOException("Format de fichier non supporté. Seuls PDF et Word (.doc, .docx) sont autorisés.");
             }
 
-            // Supprime l'ancien binaire avant d'écrire le nouveau
-            String oldKey = document.getFilePath();
-            if (oldKey == null) {
-                oldKey = b2StorageService.buildObjectKey(document.getFileName());
-            }
-            b2StorageService.delete(oldKey);
-
+            // Supprime l'ancien binaire puis stocke le nouveau (B2 ou local)
+            deleteStoredFile(document.getFilePath());
             String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
             String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
-            String objectKey = b2StorageService.upload(file, b2StorageService.buildObjectKey(uniqueFileName), contentType);
+            String storageKey = storeFile(file, uniqueFileName, contentType);
 
             document.setFileName(uniqueFileName);
             document.setOriginalFileName(originalFileName);
-            document.setFilePath(objectKey);
+            document.setFilePath(storageKey);
             document.setFileSize(file.getSize());
             document.setContentType(contentType);
         }
@@ -224,6 +226,83 @@ public class DocumentArchiveService {
         DocumentArchive saved = documentArchiveRepository.save(document); // @PreUpdate renseigne updateDate
         log.info("Document updated: {}", document.getOriginalFileName());
         return toDTO(saved);
+    }
+
+    // -------------------------------------------------------------------------
+    // Stockage abstract : B2 si activé, sinon disque local (miroir ApkService)
+    // -------------------------------------------------------------------------
+
+    private String storeFile(MultipartFile file, String uniqueFileName, String contentType) throws IOException {
+        if (b2Properties.isEnabled()) {
+            return b2StorageService.upload(file, b2StorageService.buildObjectKey(uniqueFileName), contentType);
+        }
+        Path dir = resolveWritableDocumentDirectory();
+        Path filePath = dir.resolve(uniqueFileName);
+        Files.copy(file.getInputStream(), filePath);
+        return filePath.toString();
+    }
+
+    private boolean documentExists(String storageKey) {
+        if (storageKey == null) {
+            return false;
+        }
+        if (b2Properties.isEnabled()) {
+            return b2StorageService.exists(storageKey);
+        }
+        return Files.exists(Paths.get(storageKey));
+    }
+
+    private Resource loadDocumentResource(String storageKey, String originalFileName, String contentType) throws IOException {
+        if (b2Properties.isEnabled()) {
+            return b2StorageService.downloadAsResource(storageKey, originalFileName, contentType);
+        }
+        Path path = Paths.get(storageKey);
+        if (!Files.exists(path)) {
+            throw new ResourceNotFoundException("Fichier physique non trouvé");
+        }
+        return new UrlResource(path.toUri());
+    }
+
+    private void deleteStoredFile(String storageKey) {
+        if (storageKey == null) {
+            return;
+        }
+        if (b2Properties.isEnabled()) {
+            b2StorageService.delete(storageKey);
+        } else {
+            Path path = Paths.get(storageKey);
+            if (Files.exists(path)) {
+                try {
+                    Files.delete(path);
+                } catch (IOException e) {
+                    log.warn("Impossible de supprimer le fichier local {}: {}", storageKey, e.getMessage());
+                }
+            }
+        }
+    }
+
+    private Path resolveWritableDocumentDirectory() throws IOException {
+        Path configured = Paths.get(localDocumentDir).toAbsolutePath().normalize();
+        try {
+            if (!Files.exists(configured)) {
+                Files.createDirectories(configured);
+            }
+            if (Files.isWritable(configured)) {
+                return configured;
+            }
+            log.warn("Document dir not writable, falling back to /tmp: {}", configured);
+        } catch (IOException e) {
+            log.warn("Cannot use configured document dir [{}], falling back to /tmp: {}", configured, e.getMessage());
+        }
+
+        Path fallback = Paths.get(System.getProperty("java.io.tmpdir"), "uploads", "documents").toAbsolutePath().normalize();
+        if (!Files.exists(fallback)) {
+            Files.createDirectories(fallback);
+        }
+        if (!Files.isWritable(fallback)) {
+            throw new IOException("Aucun répertoire d'upload accessible en écriture. Vérifié: " + configured + " et " + fallback);
+        }
+        return fallback;
     }
 
     private boolean isSupportedContentType(String contentType) {
