@@ -68,3 +68,110 @@ fichiers locaux absents sont simplement signalés et ignorés (aucun crash).
 ./mvnw clean package -Dmaven.test.skip=true
 java -jar target/*.jar
 ```
+
+## Intégration frontend (API APK)
+
+**Authentification** : tous les endpoints `/apk/**` sont protégés (`anyRequest().authenticated()`).
+Le JWT doit être fourni dans le header `Authorization: Bearer <token>` sur chaque requête.
+
+**Base URL** : `https://<host>` (ex. `https://itaccess-backend-production-5145.up.railway.app`).
+
+### Format de l'objet `ApkFileDTO`
+
+```json
+{
+  "id": 12,
+  "fileName": "3f2a...-e1.apk",
+  "originalFileName": "MonApp-2.3.1.apk",
+  "fileSize": 18432000,
+  "version": "2.3.1",
+  "packageName": "com.itaccess.monapp",
+  "description": "Build de prod",
+  "applicationId": 4,
+  "uploadedBy": 1,
+  "uploadDate": "2026-07-13T10:00:00",
+  "downloadCount": 7
+}
+```
+
+> Le champ `filePath` est interne (jamais exposé en JSON). Le binaire est servi via l'endpoint
+> de téléchargement, que le stockage soit local ou B2 — le frontend n'a pas à connaître l'emplacement.
+
+### Référence des endpoints
+
+| Méthode | Endpoint | Auth | Succès | Erreurs possibles |
+|---------|----------|------|--------|-------------------|
+| POST | `/apk/upload` | JWT | `201` + `ApkFileDTO` | `400` (extension/format invalide), `401` |
+| GET | `/apk` | JWT | `200` + `ApkFileDTO[]` | `401` |
+| GET | `/apk/application/{applicationId}` | JWT | `200` + `ApkFileDTO[]` | `401` |
+| GET | `/apk/{id}` | JWT | `200` + `ApkFileDTO` | `401`, `404` |
+| GET | `/apk/download/{id}` | JWT | `200` + binaire (`application/vnd.android.package-archive`) | `401`, `404` |
+| DELETE | `/apk/{id}` | JWT | `204` (No Content) | `401`, `403` (non auteur/admin), `404` |
+
+### Pagination
+
+`GET /apk` et `GET /apk/application/{id}` acceptent `?page=` (0-based) et `?size=`.
+Sans paramètres, **tous les résultats sont renvoyés** (comportement historique conservé).
+
+### Exemples (fetch / TypeScript)
+
+```ts
+const API = "https://<host>";
+const auth = () => ({ Authorization: `Bearer ${token}` });
+
+// 1) Uploader un APK
+async function uploadApk(file: File, meta: { applicationId?: number; version?: string }) {
+  const form = new FormData();
+  form.append("file", file);
+  if (meta.applicationId) form.append("applicationId", String(meta.applicationId));
+  if (meta.version) form.append("version", meta.version);
+
+  const res = await fetch(`${API}/apk/upload`, { method: "POST", headers: auth(), body: form });
+  if (res.status === 400) throw new Error("Fichier invalide (extension .apk ou contenu non APK)");
+  if (!res.ok) throw new Error(`Upload échoué (${res.status})`);
+  return res.json() as Promise<ApkFileDTO>; // 201
+}
+
+// 2) Lister les APK (pagination optionnelle)
+async function listApks(page = 0, size = 20) {
+  const res = await fetch(`${API}/apk?page=${page}&size=${size}`, { headers: auth() });
+  if (!res.ok) throw new Error(`Liste échouée (${res.status})`);
+  return res.json() as Promise<ApkFileDTO[]>;
+}
+
+// 3) Télécharger un APK (déclenche le téléchargement navigateur + incrémente le compteur)
+function downloadApk(id: number) {
+  // Le header d'auth est requis : on passe par un fetch puis un blob pour garder le token.
+  fetch(`${API}/apk/download/${id}`, { headers: auth() })
+    .then((r) => (r.ok ? r.blob() : Promise.reject(r.status)))
+    .then((blob) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `apk-${id}.apk`;
+      a.click();
+      URL.revokeObjectURL(url);
+    })
+    .catch((status) => alert(`Téléchargement impossible (${status})`));
+}
+
+// 4) Supprimer un APK (auteur ou admin uniquement -> 403 sinon)
+async function deleteApk(id: number) {
+  const res = await fetch(`${API}/apk/${id}`, { method: "DELETE", headers: auth() });
+  if (res.status === 403) throw new Error("Suppression réservée à l'auteur ou un admin");
+  if (res.status === 404) throw new Error("APK introuvable");
+  if (!res.ok) throw new Error(`Suppression échouée (${res.status})`);
+  // 204
+}
+```
+
+### Points d'attention pour le frontend
+
+- **Upload** : le champ doit s'appeler `file` (multipart). L'extension `.apk` est obligatoire et le
+  contenu réel est vérifié côté serveur (signature ZIP) — un faux `.apk` est rejeté en `400`.
+- **Suppression** : afficher un message adapté en `403` (l'utilisateur n'est ni l'auteur ni admin).
+- **Téléchargement** : l'endpoint renvoie le binaire avec `Content-Disposition: attachment` ;
+  l'incrément du compteur a lieu à chaque appel réussi (GET non idempotent, prévu).
+- **Stockage B2** (prod/Railway) : transparent pour le frontend, le binaire vient toujours de
+  l'endpoint `/apk/download/{id}`.
+
