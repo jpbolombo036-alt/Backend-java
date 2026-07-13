@@ -43,6 +43,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String errorReason = null;
         boolean success = false;
 
+        log.info("JwtAuthenticationFilter executed for {} Authorization={}", request.getRequestURI(), StringUtils.hasText(jwt) ? "present" : "missing");
+
         if (StringUtils.hasText(jwt)) {
             try {
                 username = tokenProvider.getUsernameFromToken(jwt);

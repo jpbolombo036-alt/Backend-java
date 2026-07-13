@@ -45,6 +45,9 @@ public class ApkService {
     // Service de stockage objet (B2/S3) : utilisé quand activé, sinon stockage local
     private final B2StorageService b2StorageService;
 
+    // Service de notifications système
+    private final SystemNotificationService notificationService;
+
     // Configuration B2 : permet de basculer local <-> stockage objet
     private final B2Properties b2Properties;
 
@@ -123,7 +126,22 @@ public class ApkService {
         ApkFile saved = apkFileRepository.save(apkFile); // Insère l'entité dans la table apk_files
         log.info("APK uploaded successfully: {} by user {}", originalFileName, uploadedBy);
         
-        // ÉTAPE 8 : Conversion et retour du DTO
+        // ÉTAPE 8 : Notification globale à tous les utilisateurs
+        try {
+            notificationService.createGlobalNotification(
+                "Nouvelle version APK disponible",
+                "Une nouvelle version de l'application a été uploadée : " + originalFileName +
+                " (Version: " + (version != null ? version : "N/A") + ")",
+                SystemNotification.NotificationType.INFO,
+                uploadedBy,
+                "/apk"
+            );
+            log.info("Global notification sent for APK upload: {}", originalFileName);
+        } catch (Exception e) {
+            log.error("Failed to send notification for APK upload: {}", e.getMessage(), e);
+        }
+        
+        // ÉTAPE 9 : Conversion et retour du DTO
         return toDTO(saved); // Transforme l'entité en DTO pour le retour au client
     }
     
