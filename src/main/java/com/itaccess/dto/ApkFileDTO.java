@@ -24,6 +24,7 @@ public class ApkFileDTO {
     private Long applicationId;
     private Long uploadedBy;
     private LocalDateTime uploadDate;
+    private LocalDateTime updateDate;
     private Integer downloadCount;
 
     @JsonIgnore

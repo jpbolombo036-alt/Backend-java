@@ -234,14 +234,7 @@ public class ApkService {
         }
 
         // ÉTAPE 1 : Suppression du fichier physique
-        if (b2Properties.isEnabled()) {
-            b2StorageService.delete(apkFile.getFilePath());
-        } else {
-            Path filePath = Paths.get(apkFile.getFilePath()); // Convertit le chemin en objet Path
-            if (Files.exists(filePath)) { // Vérifie que le fichier existe avant de le supprimer
-                Files.delete(filePath); // Supprime le fichier du système de fichiers
-            }
-        }
+        deleteStoredFile(apkFile.getFilePath());
 
         // ÉTAPE 2 : Suppression de l'entité en base de données
         apkFileRepository.delete(apkFile); // Supprime l'enregistrement de la table apk_files
@@ -249,6 +242,95 @@ public class ApkService {
         // ÉTAPE 3 : Audit de l'action
         auditService.logAction("DELETE_APK", "Fichier: " + apkFile.getOriginalFileName(), userId);
         log.info("APK deleted: {}", apkFile.getOriginalFileName());
+    }
+
+    /**
+     * Met à jour un APK : métadonnées et/ou remplacement du binaire.
+     * Réservé à l'auteur de l'upload ou à un administrateur.
+     * La date de mise à jour (update_date) est renseignée automatiquement par @PreUpdate.
+     * @param id : identifiant de l'APK
+     * @param userId : ID de l'utilisateur effectuant la modification
+     * @param userRole : rôle de l'utilisateur (pour le contrôle admin)
+     * @param file : nouveau binaire APK (optionnel)
+     * @param version : nouvelle version (optionnel)
+     * @param packageName : nouveau package (optionnel)
+     * @param description : nouvelle description (optionnel)
+     * @return : DTO de l'APK mis à jour
+     */
+    public ApkFileDTO updateApk(Long id, Long userId, String userRole, MultipartFile file,
+                                String version, String packageName, String description) throws IOException {
+        ApkFile apkFile = apkFileRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("APK non trouvé"));
+
+        boolean isAdmin = userRole != null && "admin".equalsIgnoreCase(userRole);
+        if (!isAdmin && !userId.equals(apkFile.getUploadedBy())) {
+            throw new SecurityException("Vous n'êtes pas autorisé à modifier cet APK");
+        }
+
+        // Remplacement éventuel du binaire
+        if (file != null && !file.isEmpty()) {
+            String originalFileName = file.getOriginalFilename();
+            if (originalFileName == null || !originalFileName.toLowerCase().endsWith(".apk")) {
+                throw new IllegalArgumentException("Seuls les fichiers APK sont autorisés");
+            }
+            if (!isZipArchive(file.getBytes())) {
+                throw new IllegalArgumentException("Le fichier n'est pas un APK valide (format attendu : archive ZIP/APK)");
+            }
+
+            // Supprime l'ancien binaire avant d'écrire le nouveau
+            deleteStoredFile(apkFile.getFilePath());
+
+            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
+            String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
+            String storageKey;
+            if (b2Properties.isEnabled()) {
+                storageKey = APK_OBJECT_PREFIX + uniqueFileName;
+                b2StorageService.upload(file, storageKey, APK_CONTENT_TYPE);
+            } else {
+                Path uploadPath = resolveWritableUploadDirectory();
+                Path filePath = uploadPath.resolve(uniqueFileName);
+                Files.copy(file.getInputStream(), filePath);
+                storageKey = filePath.toString();
+            }
+
+            apkFile.setFileName(uniqueFileName);
+            apkFile.setOriginalFileName(originalFileName);
+            apkFile.setFilePath(storageKey);
+            apkFile.setFileSize(file.getSize());
+        }
+
+        if (version != null) {
+            apkFile.setVersion(version);
+        }
+        if (packageName != null) {
+            apkFile.setPackageName(packageName);
+        }
+        if (description != null) {
+            apkFile.setDescription(description);
+        }
+
+        ApkFile saved = apkFileRepository.save(apkFile); // @PreUpdate renseigne updateDate
+        log.info("APK updated: {}", apkFile.getOriginalFileName());
+        return toDTO(saved);
+    }
+
+    /**
+     * Supprime le binaire stocké (B2 ou disque local) selon le mode de stockage actif.
+     * @param storageKey : clé B2 ou chemin local
+     */
+    private void deleteStoredFile(String storageKey) {
+        if (b2Properties.isEnabled()) {
+            b2StorageService.delete(storageKey);
+        } else {
+            Path filePath = Paths.get(storageKey);
+            if (Files.exists(filePath)) {
+                try {
+                    Files.delete(filePath);
+                } catch (IOException e) {
+                    log.warn("Impossible de supprimer le fichier local {}: {}", storageKey, e.getMessage());
+                }
+            }
+        }
     }
 
     /**
@@ -309,6 +391,7 @@ public class ApkService {
                 .applicationId(apkFile.getApplicationId())     // ID application associée
                 .uploadedBy(apkFile.getUploadedBy())            // ID utilisateur qui a uploadé
                  .uploadDate(apkFile.getUploadDate())           // Date d'upload
+                 .updateDate(apkFile.getUpdateDate())           // Date de mise à jour (auto)
                  .downloadCount(apkFile.getDownloadCount())     // Nombre de téléchargements
                  .filePath(apkFile.getFilePath())               // Chemin interne (non sérialisé)
                  .build(); // Construction finale du DTO

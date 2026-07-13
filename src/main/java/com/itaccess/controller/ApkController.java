@@ -104,6 +104,25 @@ public class ApkController {
         return ResponseEntity.ok(apkService.getApkById(id));
     }
     
+    @PutMapping("/{id}")
+    @Operation(summary = "Mettre à jour un APK", description = "Met à jour les métadonnées et/ou le binaire d'un APK (auteur ou admin)")
+    public ResponseEntity<ApkFileDTO> updateApk(
+            @PathVariable Long id,
+            @Parameter(hidden = true) @CurrentUser UserInfo currentUser,
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "version", required = false) String version,
+            @RequestParam(value = "packageName", required = false) String packageName,
+            @RequestParam(value = "description", required = false) String description) {
+        try {
+            ApkFileDTO updated = apkService.updateApk(id, currentUser.getId(), currentUser.getRole(),
+                    file, version, packageName, description);
+            return ResponseEntity.ok(updated);
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
+        }
+    }
+
     @DeleteMapping("/{id}")
     @Operation(summary = "Supprimer un APK", description = "Supprime un fichier APK (auteur ou admin uniquement)")
     public ResponseEntity<Void> deleteApk(

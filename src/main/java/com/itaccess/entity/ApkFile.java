@@ -46,6 +46,9 @@ public class ApkFile {
     @Column(name = "upload_date")
     private LocalDateTime uploadDate;
     
+    @Column(name = "update_date")
+    private LocalDateTime updateDate;
+    
     @Column(name = "download_count")
     @Builder.Default
     private Integer downloadCount = 0;
@@ -56,5 +59,10 @@ public class ApkFile {
         if (downloadCount == null) {
             downloadCount = 0;
         }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updateDate = LocalDateTime.now();
     }
 }

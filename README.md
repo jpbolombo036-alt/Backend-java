@@ -90,6 +90,7 @@ Le JWT doit être fourni dans le header `Authorization: Bearer <token>` sur chaq
   "applicationId": 4,
   "uploadedBy": 1,
   "uploadDate": "2026-07-13T10:00:00",
+  "updateDate": "2026-07-13T11:30:00",
   "downloadCount": 7
 }
 ```
@@ -105,6 +106,7 @@ Le JWT doit être fourni dans le header `Authorization: Bearer <token>` sur chaq
 | GET | `/apk` | JWT | `200` + `ApkFileDTO[]` | `401` |
 | GET | `/apk/application/{applicationId}` | JWT | `200` + `ApkFileDTO[]` | `401` |
 | GET | `/apk/{id}` | JWT | `200` + `ApkFileDTO` | `401`, `404` |
+| PUT | `/apk/{id}` | JWT | `200` + `ApkFileDTO` | `400`, `401`, `403`, `404` |
 | GET | `/apk/download/{id}` | JWT | `200` + binaire (`application/vnd.android.package-archive`) | `401`, `404` |
 | DELETE | `/apk/{id}` | JWT | `204` (No Content) | `401`, `403` (non auteur/admin), `404` |
 
