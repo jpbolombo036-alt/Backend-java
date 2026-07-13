@@ -1,5 +1,6 @@
 package com.itaccess.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,4 +25,7 @@ public class ApkFileDTO {
     private Long uploadedBy;
     private LocalDateTime uploadDate;
     private Integer downloadCount;
+
+    @JsonIgnore
+    private String filePath;
 }

@@ -9,6 +9,8 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.core.io.Resource;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -63,9 +65,9 @@ public class ApkController {
     @Operation(summary = "Télécharger un APK", description = "Télécharge un fichier APK par son ID")
     public ResponseEntity<Resource> downloadApk(@PathVariable Long id) {
         try {
-            Resource fileContent = apkService.downloadApkAsResource(id);
-            ApkFileDTO apkFile = apkService.getApkById(id);
-            
+            ApkFileDTO apkFile = apkService.downloadApk(id);
+            Resource fileContent = apkService.loadApkResource(apkFile.getFilePath(), apkFile.getOriginalFileName());
+
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType("application/vnd.android.package-archive"));
             headers.setContentDispositionFormData("attachment", apkFile.getOriginalFileName());
@@ -83,15 +85,17 @@ public class ApkController {
     }
     
     @GetMapping
-    @Operation(summary = "Liste des APK", description = "Retourne tous les fichiers APK")
-    public ResponseEntity<List<ApkFileDTO>> getAllApks() {
-        return ResponseEntity.ok(apkService.getAllApks());
+    @Operation(summary = "Liste des APK", description = "Retourne tous les fichiers APK (pagination optionnelle via page/size)")
+    public ResponseEntity<List<ApkFileDTO>> getAllApks(
+            @PageableDefault(size = Integer.MAX_VALUE) Pageable pageable) {
+        return ResponseEntity.ok(apkService.getAllApks(pageable));
     }
-    
+
     @GetMapping("/application/{applicationId}")
-    @Operation(summary = "APK par application", description = "Retourne les APK d'une application")
-    public ResponseEntity<List<ApkFileDTO>> getApksByApplication(@PathVariable Long applicationId) {
-        return ResponseEntity.ok(apkService.getApksByApplication(applicationId));
+    @Operation(summary = "APK par application", description = "Retourne les APK d'une application (pagination optionnelle via page/size)")
+    public ResponseEntity<List<ApkFileDTO>> getApksByApplication(@PathVariable Long applicationId,
+            @PageableDefault(size = Integer.MAX_VALUE) Pageable pageable) {
+        return ResponseEntity.ok(apkService.getApksByApplication(applicationId, pageable));
     }
     
     @GetMapping("/{id}")
@@ -101,12 +105,12 @@ public class ApkController {
     }
     
     @DeleteMapping("/{id}")
-    @Operation(summary = "Supprimer un APK", description = "Supprime un fichier APK (authentification requise)")
+    @Operation(summary = "Supprimer un APK", description = "Supprime un fichier APK (auteur ou admin uniquement)")
     public ResponseEntity<Void> deleteApk(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
         try {
-            apkService.deleteApk(id, currentUser.getId()); // Passe l'ID de l'utilisateur pour l'audit
+            apkService.deleteApk(id, currentUser.getId(), currentUser.getRole()); // Contrôle de propriété + audit
             return ResponseEntity.noContent().build();
         } catch (IOException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
