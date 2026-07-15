@@ -4,6 +4,7 @@ package com.itaccess.service;
 // Import des classes nécessaires pour le fonctionnement du service
 import com.itaccess.dto.ApkFileDTO;           // DTO pour transférer les données APK
 import com.itaccess.entity.ApkFile;           // Entité JPA représentant un fichier APK
+import com.itaccess.entity.SystemNotification; // Entité JPA pour les notifications système
 import com.itaccess.exception.ResourceNotFoundException; // Exception personnalisée
 import com.itaccess.config.B2Properties;      // Configuration du stockage objet B2
 import com.itaccess.repository.ApkFileRepository; // Interface pour accéder à la base de données
