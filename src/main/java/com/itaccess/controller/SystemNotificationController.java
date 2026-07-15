@@ -106,7 +106,7 @@ public class SystemNotificationController {
     public ResponseEntity<SystemNotificationDTO> markAsRead(
             @PathVariable Long id,
             @Parameter(hidden = true) @CurrentUser UserInfo currentUser) {
-        SystemNotificationDTO notification = notificationService.markAsRead(id);
+        SystemNotificationDTO notification = notificationService.markAsRead(id, currentUser.getId());
         return ResponseEntity.ok(notification);
     }
     

@@ -70,6 +70,7 @@ public class SecurityConfig {
                     auth.requestMatchers("/auth/**").permitAll();
                     auth.requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll();
                     auth.requestMatchers("/health").permitAll();
+                    auth.requestMatchers("/ws/**").permitAll();
                     if (localProfile) {
                         auth.requestMatchers("/h2-console/**").permitAll();
                         auth.requestMatchers("/debug/**").permitAll();

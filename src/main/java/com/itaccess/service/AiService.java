@@ -1381,7 +1381,7 @@ public class AiService {
 
     private String getNotifications(UserInfo currentUser) throws Exception {
         if (currentUser == null) return "[]";
-        var notifs = systemNotificationRepository.findAllByUserIdOrderByCreatedAtDesc(currentUser.getId()).stream()
+        var notifs = systemNotificationRepository.findAllVisibleByUserId(currentUser.getId()).stream()
                 .limit(20)
                 .map(n -> {
                     ObjectNode node = objectMapper.createObjectNode();
@@ -1530,7 +1530,7 @@ public class AiService {
                 .toList();
         context.set("todos", objectMapper.valueToTree(todos));
 
-        var notifications = systemNotificationRepository.findAllByUserIdOrderByCreatedAtDesc(currentUser.getId()).stream()
+        var notifications = systemNotificationRepository.findAllVisibleByUserId(currentUser.getId()).stream()
                 .limit(10)
                 .map(n -> {
                     ObjectNode node = objectMapper.createObjectNode();
