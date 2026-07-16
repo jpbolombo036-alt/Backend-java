@@ -1,9 +1,9 @@
 package com.itaccess.service;
 
-import com.itaccess.config.ApplicationContextProvider;
 import com.itaccess.config.S3Properties;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -36,6 +36,7 @@ import java.util.Map;
 public class S3StorageService {
 
     private final S3Properties s3Properties;
+    private final ObjectProvider<S3Client> s3ClientProvider;
     private S3Client s3Client;
 
     @PostConstruct
@@ -44,8 +45,12 @@ public class S3StorageService {
             log.info("S3 storage is disabled");
             return;
         }
-        this.s3Client = ApplicationContextProvider.getBean(S3Client.class);
-        log.info("S3 storage service initialized for bucket: {}", s3Properties.getBucket());
+        this.s3Client = s3ClientProvider.getIfAvailable();
+        if (this.s3Client == null) {
+            log.warn("S3 client bean not available at startup; will resolve lazily on first use");
+        } else {
+            log.info("S3 storage service initialized for bucket: {}", s3Properties.getBucket());
+        }
     }
 
     @PreDestroy
@@ -55,8 +60,18 @@ public class S3StorageService {
         }
     }
 
+    private S3Client resolveS3Client() {
+        if (s3Client == null) {
+            s3Client = s3ClientProvider.getIfAvailable();
+        }
+        if (s3Client == null) {
+            throw new IllegalStateException("S3 storage is not enabled or S3Client bean is unavailable");
+        }
+        return s3Client;
+    }
+
     public String upload(MultipartFile file, String objectKey, String contentType) throws IOException {
-        if (!s3Properties.isEnabled() || s3Client == null) {
+        if (!s3Properties.isEnabled()) {
             throw new IllegalStateException("S3 storage is not enabled");
         }
         long start = System.currentTimeMillis();
@@ -68,7 +83,8 @@ public class S3StorageService {
                 .contentLength(file.getSize())
                 .build();
 
-        s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+        S3Client client = resolveS3Client();
+        client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
 
         long duration = System.currentTimeMillis() - start;
         log.info("Uploaded {} to S3 ({} bytes) in {}ms", objectKey, file.getSize(), duration);
@@ -76,7 +92,7 @@ public class S3StorageService {
     }
 
     public String upload(Path filePath, String objectKey, String contentType, long size) throws IOException {
-        if (!s3Properties.isEnabled() || s3Client == null) {
+        if (!s3Properties.isEnabled()) {
             throw new IllegalStateException("S3 storage is not enabled");
         }
         long start = System.currentTimeMillis();
@@ -88,7 +104,8 @@ public class S3StorageService {
                 .contentLength(size)
                 .build();
 
-        s3Client.putObject(putObjectRequest, RequestBody.fromFile(filePath));
+        S3Client client = resolveS3Client();
+        client.putObject(putObjectRequest, RequestBody.fromFile(filePath));
 
         long duration = System.currentTimeMillis() - start;
         log.info("Uploaded {} to S3 ({} bytes) in {}ms", objectKey, size, duration);
@@ -96,15 +113,16 @@ public class S3StorageService {
     }
 
     public boolean exists(String objectKey) {
-        if (!s3Properties.isEnabled() || s3Client == null) {
+        if (!s3Properties.isEnabled()) {
             return false;
         }
         try {
+            S3Client client = resolveS3Client();
             HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
                     .bucket(s3Properties.getBucket())
                     .key(objectKey)
                     .build();
-            HeadObjectResponse response = s3Client.headObject(headObjectRequest);
+            HeadObjectResponse response = client.headObject(headObjectRequest);
             return response != null;
         } catch (S3Exception e) {
             if (e.statusCode() == 404) {
@@ -119,15 +137,16 @@ public class S3StorageService {
     }
 
     public long getSize(String objectKey) {
-        if (!s3Properties.isEnabled() || s3Client == null) {
+        if (!s3Properties.isEnabled()) {
             return -1;
         }
         try {
+            S3Client client = resolveS3Client();
             HeadObjectRequest headObjectRequest = HeadObjectRequest.builder()
                     .bucket(s3Properties.getBucket())
                     .key(objectKey)
                     .build();
-            HeadObjectResponse response = s3Client.headObject(headObjectRequest);
+            HeadObjectResponse response = client.headObject(headObjectRequest);
             return response.contentLength();
         } catch (Exception e) {
             log.warn("Error getting S3 object size for key {}: {}", objectKey, e.getMessage());
@@ -136,17 +155,18 @@ public class S3StorageService {
     }
 
     public Resource downloadAsResource(String objectKey, String originalFileName, String contentType) throws IOException {
-        if (!s3Properties.isEnabled() || s3Client == null) {
+        if (!s3Properties.isEnabled()) {
             throw new IllegalStateException("S3 storage is not enabled");
         }
 
         try {
+            S3Client client = resolveS3Client();
             software.amazon.awssdk.services.s3.model.GetObjectRequest getObjectRequest = software.amazon.awssdk.services.s3.model.GetObjectRequest.builder()
                     .bucket(s3Properties.getBucket())
                     .key(objectKey)
                     .build();
 
-            ResponseInputStream<?> s3Object = s3Client.getObject(getObjectRequest);
+            ResponseInputStream<?> s3Object = client.getObject(getObjectRequest);
             byte[] body = s3Object.readAllBytes();
 
             return new S3Resource(body, contentType, originalFileName != null ? originalFileName : objectKey);
@@ -156,16 +176,17 @@ public class S3StorageService {
     }
 
     public void delete(String objectKey) {
-        if (!s3Properties.isEnabled() || s3Client == null) {
+        if (!s3Properties.isEnabled()) {
             return;
         }
         try {
+            S3Client client = resolveS3Client();
             DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
                     .bucket(s3Properties.getBucket())
                     .key(objectKey)
                     .build();
 
-            s3Client.deleteObject(deleteObjectRequest);
+            client.deleteObject(deleteObjectRequest);
             log.info("Deleted object from S3: {}", objectKey);
         } catch (Exception e) {
             log.warn("Failed to delete object from S3: {} - {}", objectKey, e.getMessage());
