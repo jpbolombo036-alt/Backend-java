@@ -13,4 +13,5 @@ public class AiChatResponse {
     private String model;
     private boolean error;
     private String errorMessage;
+    private Long conversationId;
 }

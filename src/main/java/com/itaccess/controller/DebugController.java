@@ -46,6 +46,7 @@ public class DebugController {
         result.put("s3ApkPrefix", environment.getProperty("app.storage.s3.apk-prefix"));
         result.put("s3AccessKeyPresent", environment.getProperty("app.storage.s3.access-key") != null);
         result.put("s3SecretKeyPresent", environment.getProperty("app.storage.s3.secret-key") != null);
+        result.put("s3SecretKeyMasked", maskSecret(environment.getProperty("app.storage.s3.secret-key")));
         return ResponseEntity.ok(result);
     }
 
@@ -57,5 +58,11 @@ public class DebugController {
     private String maskJwt(String jwt) {
         if (jwt == null || jwt.length() <= 12) return jwt;
         return jwt.substring(0, 6) + "..." + jwt.substring(jwt.length() - 4);
+    }
+
+    private String maskSecret(String secret) {
+        if (secret == null || secret.isBlank()) return null;
+        if (secret.length() <= 8) return "***";
+        return secret.substring(0, 4) + "***" + secret.substring(secret.length() - 4);
     }
 }

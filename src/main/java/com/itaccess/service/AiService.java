@@ -6,13 +6,15 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.itaccess.dto.AiChatRequest;
 import com.itaccess.dto.AiChatResponse;
+import com.itaccess.entity.*;
 import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.*;
 import com.itaccess.security.UserInfo;
-import com.itaccess.entity.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -43,6 +45,9 @@ public class AiService {
     private final SystemNotificationRepository systemNotificationRepository;
     private final ReportGenerationRepository reportGenerationRepository;
     private final HabilitationRepository habilitationRepository;
+    private final AiConversationRepository aiConversationRepository;
+    private final AiChatMessageRepository aiChatMessageRepository;
+    private final AttachmentRepository attachmentRepository;
     private final ObjectMapper objectMapper;
 
     private final MessageService messageService;
@@ -118,13 +123,16 @@ public class AiService {
         TOOL_KEYWORDS.put("search_documents", List.of("rechercher dans les documents", "recherche document", "rechercher les documents"));
     }
 
-    public AiChatResponse chat(List<AiChatRequest.AiMessage> messages, UserInfo currentUser) {
+    public AiChatResponse chat(String conversationId, List<AiChatRequest.AiMessage> messages, UserInfo currentUser) {
         if (openAiApiKey == null || openAiApiKey.isBlank()) {
             return AiChatResponse.builder()
                     .error(true)
                     .errorMessage("Clé API OpenAI non configurée. Ajoutez OPENAI_API_KEY dans votre fichier .env")
                     .build();
         }
+
+        AiConversation conversation = resolveConversation(conversationId, currentUser);
+        persistUserMessages(conversation, messages);
 
         RestClient restClient = RestClient.create();
         String lastUserMessage = extractLastUserMessage(messages);
@@ -134,7 +142,11 @@ public class AiService {
         try {
             ObjectNode requestBody = buildRequestBody(messages, currentUser, allowedTools);
             String responseJson = postWithRetry(restClient, requestBody, userId);
-            return processOpenAiResponse(responseJson, messages, restClient, currentUser);
+            AiChatResponse response = processOpenAiResponse(responseJson, messages, restClient, currentUser);
+            persistAssistantMessage(conversation, response.getReply());
+            updateConversationTitle(conversation, lastUserMessage);
+            response.setConversationId(conversation.getId());
+            return response;
 
         } catch (AiCallException e) {
             if (e.statusCode == 429 || (e.statusCode >= 500 && e.statusCode < 600)) {
@@ -142,26 +154,126 @@ public class AiService {
                 log.warn("Quota/erreur IA épuisé model={} userId={} status={} retryDelay={}s -> réponse dégradée",
                         openAiModel, userId, e.statusCode, e.retryDelaySeconds);
                 if (e.statusCode == 429) {
-                    return buildDegradedResponse(
+                    AiChatResponse degraded = buildDegradedResponse(
                             "⚠️ Le quota de l'assistant IA est temporairement atteint (limite gratuite Gemini). "
                                     + "Réessayez dans environ " + wait + " secondes.", wait, currentUser);
+                    persistAssistantMessage(conversation, degraded.getReply());
+                    updateConversationTitle(conversation, lastUserMessage);
+                    degraded.setConversationId(conversation.getId());
+                    return degraded;
                 }
-                return buildDegradedResponse(
+                AiChatResponse degraded = buildDegradedResponse(
                         "Le service IA est temporairement indisponible (erreur " + e.statusCode
                                 + "). Réessayez dans quelques instants.", wait, currentUser);
+                persistAssistantMessage(conversation, degraded.getReply());
+                updateConversationTitle(conversation, lastUserMessage);
+                degraded.setConversationId(conversation.getId());
+                return degraded;
             }
             log.error("Erreur lors de l'appel à l'IA model={} userId={} status={}", openAiModel, userId, e.statusCode, e);
-            return AiChatResponse.builder()
+            AiChatResponse errorResponse = AiChatResponse.builder()
                     .error(true)
                     .errorMessage("Erreur lors de la communication avec l'IA : " + e.getMessage())
                     .build();
+            persistAssistantMessage(conversation, errorResponse.getErrorMessage());
+            updateConversationTitle(conversation, lastUserMessage);
+            errorResponse.setConversationId(conversation.getId());
+            return errorResponse;
         } catch (Exception e) {
             log.error("Erreur inattendue lors de l'appel à l'IA model={} userId={}", openAiModel, userId, e);
-            return AiChatResponse.builder()
+            AiChatResponse errorResponse = AiChatResponse.builder()
                     .error(true)
                     .errorMessage("Erreur lors de la communication avec l'IA : " + e.getMessage())
                     .build();
+            persistAssistantMessage(conversation, errorResponse.getErrorMessage());
+            updateConversationTitle(conversation, lastUserMessage);
+            errorResponse.setConversationId(conversation.getId());
+            return errorResponse;
         }
+    }
+
+    private AiConversation resolveConversation(String conversationId, UserInfo currentUser) {
+        if (conversationId != null && !conversationId.isBlank()) {
+            try {
+                Long id = Long.parseLong(conversationId);
+                AiConversation conv = aiConversationRepository.findById(id)
+                        .orElseThrow(() -> new ResourceNotFoundException("Conversation IA non trouvée"));
+                if (currentUser != null && !conv.getUserId().equals(currentUser.getId())) {
+                    throw new SecurityException("Accès non autorisé à cette conversation");
+                }
+                return conv;
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("conversationId invalide");
+            }
+        }
+        AiConversation conversation = AiConversation.builder()
+                .userId(currentUser != null ? currentUser.getId() : 0L)
+                .title("Nouvelle conversation")
+                .build();
+        return aiConversationRepository.save(conversation);
+    }
+
+    private void persistUserMessages(AiConversation conversation, List<AiChatRequest.AiMessage> messages) {
+        if (messages == null) return;
+        for (AiChatRequest.AiMessage msg : messages) {
+            if ("user".equalsIgnoreCase(msg.getRole()) && msg.getContent() != null) {
+                AiChatMessage chatMessage = AiChatMessage.builder()
+                        .conversation(conversation)
+                        .role(msg.getRole())
+                        .content(msg.getContent())
+                        .build();
+                aiChatMessageRepository.save(chatMessage);
+            }
+        }
+    }
+
+    private void persistAssistantMessage(AiConversation conversation, String content) {
+        if (content == null || content.isBlank()) return;
+        AiChatMessage chatMessage = AiChatMessage.builder()
+                .conversation(conversation)
+                .role("assistant")
+                .content(content)
+                .build();
+        aiChatMessageRepository.save(chatMessage);
+        conversation.setUpdatedAt(java.time.LocalDateTime.now());
+        aiConversationRepository.save(conversation);
+    }
+
+    private void updateConversationTitle(AiConversation conversation, String firstUserMessage) {
+        if (conversation.getTitle() == null || conversation.getTitle().equals("Nouvelle conversation")) {
+            if (firstUserMessage != null && !firstUserMessage.isBlank()) {
+                String title = firstUserMessage.length() > 80 ? firstUserMessage.substring(0, 80) + "..." : firstUserMessage;
+                conversation.setTitle(title);
+                aiConversationRepository.save(conversation);
+            }
+        }
+    }
+
+    public org.springframework.data.domain.Page<AiConversation> getConversations(Long userId, org.springframework.data.domain.Pageable pageable) {
+        return aiConversationRepository.findByUserIdOrderByUpdatedAtDesc(userId, pageable);
+    }
+
+    public org.springframework.data.domain.Page<AiChatMessage> getConversationMessages(Long conversationId, org.springframework.data.domain.Pageable pageable) {
+        return aiChatMessageRepository.findByConversationIdOrderByCreatedAtAsc(conversationId, pageable);
+    }
+
+    public void deleteConversation(Long conversationId, Long userId) {
+        AiConversation conversation = aiConversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation IA non trouvée"));
+        if (!conversation.getUserId().equals(userId)) {
+            throw new SecurityException("Accès non autorisé à cette conversation");
+        }
+        aiConversationRepository.delete(conversation);
+    }
+
+    public AiConversation renameConversation(Long conversationId, Long userId, String title) {
+        AiConversation conversation = aiConversationRepository.findById(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation IA non trouvée"));
+        if (!conversation.getUserId().equals(userId)) {
+            throw new SecurityException("Accès non autorisé à cette conversation");
+        }
+        conversation.setTitle(title);
+        return aiConversationRepository.save(conversation);
     }
 
     private ObjectNode buildRequestBody(List<AiChatRequest.AiMessage> messages, UserInfo currentUser, Set<String> allowedTools) {
@@ -648,6 +760,130 @@ public class AiService {
                 "Recherche avancée dans les documents et notes par titre, contenu ou auteur.",
                 searchProps));
 
+        ObjectNode getAppByIdProps = new ObjectMapper().createObjectNode();
+        ObjectNode getAppIdProp = new ObjectMapper().createObjectNode();
+        getAppIdProp.put("type", "integer");
+        getAppIdProp.put("description", "ID de l'application.");
+        getAppByIdProps.set("id", getAppIdProp);
+        tools.add(buildTool("get_application_by_id",
+                "Retourne les détails d'une application par son ID.",
+                getAppByIdProps));
+
+        ObjectNode getCompteByIdProps = new ObjectMapper().createObjectNode();
+        ObjectNode getCompteIdProp = new ObjectMapper().createObjectNode();
+        getCompteIdProp.put("type", "integer");
+        getCompteIdProp.put("description", "ID du compte d'accès.");
+        getCompteByIdProps.set("id", getCompteIdProp);
+        tools.add(buildTool("get_compte_by_id",
+                "Retourne les détails d'un compte d'accès par son ID.",
+                getCompteByIdProps));
+
+        ObjectNode getBugByIdProps = new ObjectMapper().createObjectNode();
+        ObjectNode getBugIdProp = new ObjectMapper().createObjectNode();
+        getBugIdProp.put("type", "integer");
+        getBugIdProp.put("description", "ID du bug.");
+        getBugByIdProps.set("id", getBugIdProp);
+        tools.add(buildTool("get_bug_by_id",
+                "Retourne les détails d'un bug par son ID.",
+                getBugByIdProps));
+
+        ObjectNode getTodoByIdProps = new ObjectMapper().createObjectNode();
+        ObjectNode getTodoIdProp = new ObjectMapper().createObjectNode();
+        getTodoIdProp.put("type", "integer");
+        getTodoIdProp.put("description", "ID de la tâche.");
+        getTodoByIdProps.set("id", getTodoIdProp);
+        tools.add(buildTool("get_todo_by_id",
+                "Retourne les détails d'une tâche par son ID.",
+                getTodoByIdProps));
+
+        ObjectNode getSessionDetailsProps = new ObjectMapper().createObjectNode();
+        ObjectNode getSessionIdProp = new ObjectMapper().createObjectNode();
+        getSessionIdProp.put("type", "integer");
+        getSessionIdProp.put("description", "ID de la session de test.");
+        getSessionDetailsProps.set("id", getSessionIdProp);
+        ObjectNode includeTestsProp = new ObjectMapper().createObjectNode();
+        includeTestsProp.put("type", "boolean");
+        includeTestsProp.put("description", "Inclure les étapes de test. Par défaut false.");
+        getSessionDetailsProps.set("includeTests", includeTestsProp);
+        tools.add(buildTool("get_test_session_details",
+                "Retourne les détails d'une session de test, optionally avec ses étapes.",
+                getSessionDetailsProps));
+
+        ObjectNode getAttachmentsProps = new ObjectMapper().createObjectNode();
+        ObjectNode getAttEntityIdProp = new ObjectMapper().createObjectNode();
+        getAttEntityIdProp.put("type", "integer");
+        getAttEntityIdProp.put("description", "ID de l'entité (compte, application, bug, etc.).");
+        getAttachmentsProps.set("entityId", getAttEntityIdProp);
+        ObjectNode getAttEntityTypeProp = new ObjectMapper().createObjectNode();
+        getAttEntityTypeProp.put("type", "string");
+        getAttEntityTypeProp.put("description", "Type d'entité : 'compte', 'application', 'bug', 'test_step'.");
+        getAttachmentsProps.set("entityType", getAttEntityTypeProp);
+        tools.add(buildTool("get_attachments",
+                "Retourne les pièces jointes d'une entité par son ID et type.",
+                getAttachmentsProps));
+
+        ObjectNode createAppProps = new ObjectMapper().createObjectNode();
+        ObjectNode createAppNameProp = new ObjectMapper().createObjectNode();
+        createAppNameProp.put("type", "string");
+        createAppNameProp.put("description", "Nom de l'application (obligatoire).");
+        createAppProps.set("nom", createAppNameProp);
+        ObjectNode createAppDescProp = new ObjectMapper().createObjectNode();
+        createAppDescProp.put("type", "string");
+        createAppDescProp.put("description", "Description de l'application.");
+        createAppProps.set("description", createAppDescProp);
+        ObjectNode createAppEnvProp = new ObjectMapper().createObjectNode();
+        createAppEnvProp.put("type", "string");
+        createAppEnvProp.put("description", "Environnement : 'DEV', 'STAGING', 'PROD'.");
+        createAppProps.set("environnement", createAppEnvProp);
+        tools.add(buildTool("create_application",
+                "Crée une nouvelle application IT (admin uniquement).",
+                createAppProps));
+
+        ObjectNode updateAppProps = new ObjectMapper().createObjectNode();
+        updateAppProps.set("id", getAppIdProp);
+        ObjectNode updAppNameProp = new ObjectMapper().createObjectNode();
+        updAppNameProp.put("type", "string");
+        updAppNameProp.put("description", "Nouveau nom (optionnel).");
+        updateAppProps.set("nom", updAppNameProp);
+        ObjectNode updAppDescProp = new ObjectMapper().createObjectNode();
+        updAppDescProp.put("type", "string");
+        updAppDescProp.put("description", "Nouvelle description (optionnel).");
+        updateAppProps.set("description", updAppDescProp);
+        tools.add(buildTool("update_application",
+                "Met à jour une application existante (admin uniquement).",
+                updateAppProps));
+
+        ObjectNode createCompteProps = new ObjectMapper().createObjectNode();
+        createCompteProps.set("applicationId", getAppIdProp);
+        ObjectNode createCompteUsernameProp = new ObjectMapper().createObjectNode();
+        createCompteUsernameProp.put("type", "string");
+        createCompteUsernameProp.put("description", "Nom d'utilisateur du compte (obligatoire).");
+        createCompteProps.set("username", createCompteUsernameProp);
+        ObjectNode createCompteCodeProp = new ObjectMapper().createObjectNode();
+        createCompteCodeProp.put("type", "string");
+        createCompteCodeProp.put("description", "Mot de passe ou code d'accès (obligatoire).");
+        createCompteProps.set("code", createCompteCodeProp);
+        ObjectNode createCompteRoleProp = new ObjectMapper().createObjectNode();
+        createCompteRoleProp.put("type", "string");
+        createCompteRoleProp.put("description", "Rôle du compte (optionnel).");
+        createCompteProps.set("role", createCompteRoleProp);
+        tools.add(buildTool("create_compte",
+                "Crée un nouveau compte d'accès pour une application (admin uniquement).",
+                createCompteProps));
+
+        ObjectNode updateUserStatusProps = new ObjectMapper().createObjectNode();
+        ObjectNode updateUserIdProp = new ObjectMapper().createObjectNode();
+        updateUserIdProp.put("type", "integer");
+        updateUserIdProp.put("description", "ID de l'utilisateur.");
+        updateUserStatusProps.set("userId", updateUserIdProp);
+        ObjectNode updateActiveProp = new ObjectMapper().createObjectNode();
+        updateActiveProp.put("type", "boolean");
+        updateActiveProp.put("description", "true pour activer, false pour désactiver.");
+        updateUserStatusProps.set("active", updateActiveProp);
+        tools.add(buildTool("update_user_status",
+                "Active ou désactive un utilisateur (admin uniquement).",
+                updateUserStatusProps));
+
         return tools;
     }
 
@@ -800,6 +1036,16 @@ public class AiService {
                 case "search" -> search(argsJson);
                 case "get_user_context" -> getUserContext(currentUser);
                 case "search_documents" -> searchDocuments(argsJson);
+                case "get_application_by_id" -> getApplicationById(argsJson);
+                case "get_compte_by_id" -> getCompteById(argsJson);
+                case "get_bug_by_id" -> getBugById(argsJson);
+                case "get_todo_by_id" -> getTodoById(argsJson);
+                case "get_test_session_details" -> getTestSessionDetails(argsJson);
+                case "get_attachments" -> getAttachments(argsJson);
+                case "create_application" -> createApplication(argsJson, currentUser);
+                case "update_application" -> updateApplication(argsJson, currentUser);
+                case "create_compte" -> createCompte(argsJson, currentUser);
+                case "update_user_status" -> updateUserStatus(argsJson, currentUser);
                 default -> "{\"error\": \"Fonction inconnue : " + functionName + "\"}";
             };
         } catch (Exception e) {
@@ -1591,6 +1837,221 @@ public class AiService {
         result.put("query", lower);
         result.put("total", results.size());
         result.set("results", objectMapper.valueToTree(results));
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String getApplicationById(String argsJson) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long id = args.path("id").asLong(0);
+        if (id == 0) return "{\"error\": \"ID application requis.\"}";
+        Application app = applicationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Application non trouvée"));
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("id", app.getId());
+        node.put("nom", app.getNom());
+        node.put("description", app.getDescription());
+        node.put("version", app.getVersion());
+        node.put("environnement", app.getEnvironnement());
+        node.put("dateCreation", app.getDateCreation() != null ? app.getDateCreation().toString() : null);
+        node.put("createdBy", app.getCreatedBy());
+        return objectMapper.writeValueAsString(node);
+    }
+
+    private String getCompteById(String argsJson) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long id = args.path("id").asLong(0);
+        if (id == 0) return "{\"error\": \"ID compte requis.\"}";
+        Compte compte = compteRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Compte non trouvé"));
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("id", compte.getId());
+        node.put("applicationId", compte.getApplicationId());
+        node.put("username", compte.getUsername());
+        node.put("role", compte.getRole());
+        node.put("commentaire", compte.getCommentaire());
+        node.put("createdBy", compte.getCreatedBy());
+        return objectMapper.writeValueAsString(node);
+    }
+
+    private String getBugById(String argsJson) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long id = args.path("id").asLong(0);
+        if (id == 0) return "{\"error\": \"ID bug requis.\"}";
+        Bug bug = bugRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Bug non trouvé"));
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("id", bug.getId());
+        node.put("title", bug.getTitle());
+        node.put("severity", bug.getSeverity());
+        node.put("priority", bug.getPriority());
+        node.put("status", bug.getStatus());
+        node.put("reproducibility", bug.getReproducibility());
+        node.put("assignedTo", bug.getAssignedTo());
+        node.put("createdAt", bug.getCreatedAt() != null ? bug.getCreatedAt().toString() : null);
+        return objectMapper.writeValueAsString(node);
+    }
+
+    private String getTodoById(String argsJson) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long id = args.path("id").asLong(0);
+        if (id == 0) return "{\"error\": \"ID tâche requis.\"}";
+        Todo todo = todoRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Tâche non trouvée"));
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("id", todo.getId());
+        node.put("title", todo.getTitle());
+        node.put("description", todo.getDescription());
+        node.put("priority", todo.getPriority());
+        node.put("completed", todo.getCompleted() != null && todo.getCompleted());
+        node.put("dueDate", todo.getDueDate() != null ? todo.getDueDate().toString() : null);
+        node.put("createdBy", todo.getCreatedBy());
+        return objectMapper.writeValueAsString(node);
+    }
+
+    private String getTestSessionDetails(String argsJson) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long id = args.path("id").asLong(0);
+        boolean includeTests = args.path("includeTests").asBoolean(false);
+        if (id == 0) return "{\"error\": \"ID session requis.\"}";
+        TestSession session = testSessionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Session de test non trouvée"));
+        ObjectNode node = objectMapper.createObjectNode();
+        node.put("id", session.getId());
+        node.put("nom", session.getNom());
+        node.put("environnement", session.getEnvironnement());
+        node.put("version", session.getVersion());
+        node.put("statut", session.getStatut());
+        node.put("plateforme", session.getPlateforme());
+        node.put("dateCreation", session.getDateCreation() != null ? session.getDateCreation().toString() : null);
+        node.put("createdBy", session.getCreatedBy());
+
+        if (includeTests) {
+            var tests = testRepository.findBySessionId(id).stream().limit(50).map(t -> {
+                ObjectNode tn = objectMapper.createObjectNode();
+                tn.put("id", t.getId());
+                tn.put("fonction", t.getFonction());
+                tn.put("statut", t.getStatut());
+                tn.put("commentaires", t.getCommentaires());
+                return tn;
+            }).toList();
+            node.set("tests", objectMapper.valueToTree(tests));
+        }
+        return objectMapper.writeValueAsString(node);
+    }
+
+    private String getAttachments(String argsJson) throws Exception {
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long entityId = args.path("entityId").asLong(0);
+        String entityType = args.path("entityType").asText(null);
+        if (entityId == 0 || entityType == null) return "{\"error\": \"entityId et entityType requis.\"}";
+        List<Attachment> attachments;
+        switch (entityType) {
+            case "bug" -> attachments = attachmentRepository.findByBugId(entityId);
+            case "test_step" -> attachments = attachmentRepository.findByTestStepId(entityId);
+            case "message" -> attachments = attachmentRepository.findByMessageId(entityId);
+            default -> attachments = List.of();
+        }
+        List<ObjectNode> results = attachments.stream().limit(20).map(a -> {
+            ObjectNode node = objectMapper.createObjectNode();
+            node.put("id", a.getId());
+            node.put("fileName", a.getFileName());
+            node.put("fileSize", a.getFileSize());
+            node.put("contentType", a.getContentType());
+            node.put("createdAt", a.getCreatedAt() != null ? a.getCreatedAt().toString() : null);
+            return node;
+        }).toList();
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("entityType", entityType);
+        result.put("entityId", entityId);
+        result.put("total", results.size());
+        result.set("attachments", objectMapper.valueToTree(results));
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String createApplication(String argsJson, UserInfo currentUser) throws Exception {
+        if (currentUser == null || !"admin".equalsIgnoreCase(currentUser.getRole())) {
+            return "{\"error\": \"Droits admin requis.\"}";
+        }
+        JsonNode args = objectMapper.readTree(argsJson);
+        String nom = args.path("nom").asText(null);
+        if (nom == null || nom.isBlank()) return "{\"error\": \"Le nom de l'application est obligatoire.\"}";
+        Application app = Application.builder()
+                .nom(nom)
+                .description(args.path("description").asText(null))
+                .environnement(args.path("environnement").asText(null))
+                .createdBy(currentUser.getId())
+                .build();
+        Application saved = applicationRepository.save(app);
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("success", true);
+        result.put("id", saved.getId());
+        result.put("nom", saved.getNom());
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String updateApplication(String argsJson, UserInfo currentUser) throws Exception {
+        if (currentUser == null || !"admin".equalsIgnoreCase(currentUser.getRole())) {
+            return "{\"error\": \"Droits admin requis.\"}";
+        }
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long id = args.path("id").asLong(0);
+        if (id == 0) return "{\"error\": \"ID application requis.\"}";
+        Application app = applicationRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Application non trouvée"));
+        if (args.has("nom") && !args.path("nom").isMissingNode()) app.setNom(args.path("nom").asText());
+        if (args.has("description") && !args.path("description").isMissingNode()) app.setDescription(args.path("description").asText(null));
+        if (args.has("environnement") && !args.path("environnement").isMissingNode()) app.setEnvironnement(args.path("environnement").asText(null));
+        Application saved = applicationRepository.save(app);
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("success", true);
+        result.put("id", saved.getId());
+        result.put("nom", saved.getNom());
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String createCompte(String argsJson, UserInfo currentUser) throws Exception {
+        if (currentUser == null || !"admin".equalsIgnoreCase(currentUser.getRole())) {
+            return "{\"error\": \"Droits admin requis.\"}";
+        }
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long applicationId = args.path("applicationId").asLong(0);
+        String username = args.path("username").asText(null);
+        String code = args.path("code").asText(null);
+        if (applicationId == 0 || username == null || username.isBlank() || code == null || code.isBlank()) {
+            return "{\"error\": \"applicationId, username et code sont obligatoires.\"}";
+        }
+        Compte compte = Compte.builder()
+                .applicationId(applicationId)
+                .username(username)
+                .code(code)
+                .role(args.path("role").asText(null))
+                .commentaire(args.path("commentaire").asText(null))
+                .createdBy(currentUser.getId())
+                .build();
+        Compte saved = compteRepository.save(compte);
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("success", true);
+        result.put("id", saved.getId());
+        result.put("username", saved.getUsername());
+        return objectMapper.writeValueAsString(result);
+    }
+
+    private String updateUserStatus(String argsJson, UserInfo currentUser) throws Exception {
+        if (currentUser == null || !"admin".equalsIgnoreCase(currentUser.getRole())) {
+            return "{\"error\": \"Droits admin requis.\"}";
+        }
+        JsonNode args = objectMapper.readTree(argsJson);
+        Long userId = args.path("userId").asLong(0);
+        boolean active = args.path("active").asBoolean(true);
+        if (userId == 0) return "{\"error\": \"userId requis.\"}";
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé"));
+        user.setIsActive(active);
+        userRepository.save(user);
+        ObjectNode result = objectMapper.createObjectNode();
+        result.put("success", true);
+        result.put("userId", user.getId());
+        result.put("active", user.getIsActive());
         return objectMapper.writeValueAsString(result);
     }
 }
