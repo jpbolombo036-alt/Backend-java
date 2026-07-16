@@ -72,6 +72,15 @@ app:
       endpoint: ${B2_ENDPOINT:https://s3.us-east-005.backblazeb2.com}
       region: ${B2_REGION:us-east-005}
       documents-prefix: ${B2_DOCUMENTS_PREFIX:document-archive/}
+    s3:
+      enabled: ${S3_ENABLED:false}
+      access-key: ${S3_ACCESS_KEY:}
+      secret-key: ${S3_SECRET_KEY:}
+      bucket: ${S3_BUCKET:}
+      endpoint: ${S3_ENDPOINT:}
+      region: ${S3_REGION:us-east-1}
+      documents-prefix: ${S3_DOCUMENTS_PREFIX:document-archive/}
+      apk-prefix: ${S3_APK_PREFIX:apk/}
 
   openai:
     api-key: ${OPENAI_API_KEY:}

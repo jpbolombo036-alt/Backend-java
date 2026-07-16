@@ -38,6 +38,14 @@ public class DebugController {
         result.put("activeProfiles", String.join(",", environment.getActiveProfiles()));
         result.put("railwayEnvPresent", environment.getProperty("DATABASE_URL") != null);
         result.put("springDatasourceUrlPresent", environment.getProperty("SPRING_DATASOURCE_URL") != null);
+        result.put("s3Enabled", environment.getProperty("app.storage.s3.enabled"));
+        result.put("s3Bucket", environment.getProperty("app.storage.s3.bucket"));
+        result.put("s3Endpoint", environment.getProperty("app.storage.s3.endpoint"));
+        result.put("s3Region", environment.getProperty("app.storage.s3.region"));
+        result.put("s3DocumentsPrefix", environment.getProperty("app.storage.s3.documents-prefix"));
+        result.put("s3ApkPrefix", environment.getProperty("app.storage.s3.apk-prefix"));
+        result.put("s3AccessKeyPresent", environment.getProperty("app.storage.s3.access-key") != null);
+        result.put("s3SecretKeyPresent", environment.getProperty("app.storage.s3.secret-key") != null);
         return ResponseEntity.ok(result);
     }
 

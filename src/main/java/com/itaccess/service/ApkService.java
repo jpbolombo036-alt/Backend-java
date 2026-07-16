@@ -6,9 +6,13 @@ import com.itaccess.dto.ApkFileDTO;           // DTO pour transférer les donné
 import com.itaccess.entity.ApkFile;           // Entité JPA représentant un fichier APK
 import com.itaccess.entity.SystemNotification; // Entité JPA pour les notifications système
 import com.itaccess.exception.ResourceNotFoundException; // Exception personnalisée
-import com.itaccess.config.B2Properties;      // Configuration du stockage objet B2
-import com.itaccess.repository.ApkFileRepository; // Interface pour accéder à la base de données
-import com.itaccess.service.B2StorageService; // Service de stockage objet (B2/S3)
+import com.itaccess.config.B2Properties;
+import com.itaccess.config.S3Properties;
+import com.itaccess.repository.ApkFileRepository;
+import com.itaccess.service.AuditService;
+import com.itaccess.service.B2StorageService;
+import com.itaccess.service.S3StorageService;
+import com.itaccess.service.SystemNotificationService;
 import lombok.RequiredArgsConstructor;       // Annotation Lombok pour générer le constructeur
 import lombok.extern.slf4j.Slf4j;           // Annotation Lombok pour les logs
 import org.springframework.beans.factory.annotation.Value; // Pour injecter des valeurs depuis application.yml
@@ -45,6 +49,7 @@ public class ApkService {
 
     // Service de stockage objet (B2/S3) : utilisé quand activé, sinon stockage local
     private final B2StorageService b2StorageService;
+    private final S3StorageService s3StorageService;
 
     // Service de notifications système
     private final SystemNotificationService notificationService;
@@ -52,8 +57,13 @@ public class ApkService {
     // Configuration B2 : permet de basculer local <-> stockage objet
     private final B2Properties b2Properties;
 
+    // Configuration S3 : permet de basculer local <-> stockage objet (Railway, etc.)
+    private final S3Properties s3Properties;
+
     // Préfixe des objets APK dans le bucket B2
     private static final String APK_OBJECT_PREFIX = "apk/";
+    // Préfixe des objets APK dans le bucket S3
+    private static final String APK_S3_PREFIX = "apk/";
     // Type MIME des APK
     private static final String APK_CONTENT_TYPE = "application/vnd.android.package-archive";
     
@@ -89,9 +99,14 @@ public class ApkService {
             throw new IllegalArgumentException("Le fichier n'est pas un APK valide (format attendu : archive ZIP/APK)");
         }
 
-        // Stockage : B2 (stockage objet) si activé, sinon disque local
+        // Stockage : S3 si activé, B2 si activé, sinon disque local
         String storageKey;
-        if (b2Properties.isEnabled()) {
+        if (s3Properties.isEnabled()) {
+            storageKey = APK_S3_PREFIX + uniqueFileName;
+            log.info("Uploading APK to S3: {}", storageKey);
+            s3StorageService.upload(file, storageKey, APK_CONTENT_TYPE);
+            log.info("APK uploaded to S3 successfully");
+        } else if (b2Properties.isEnabled()) {
             storageKey = APK_OBJECT_PREFIX + uniqueFileName;
             log.info("Uploading APK to B2: {}", storageKey);
             b2StorageService.upload(file, storageKey, APK_CONTENT_TYPE);
@@ -160,7 +175,11 @@ public class ApkService {
                 .orElseThrow(() -> new ResourceNotFoundException("APK non trouvé"));
 
         // Vérifie d'abord l'existence du fichier physique avant toute mutation
-        if (b2Properties.isEnabled()) {
+        if (s3Properties.isEnabled()) {
+            if (!s3StorageService.exists(apkFile.getFilePath())) {
+                throw new ResourceNotFoundException("Fichier physique non trouvé");
+            }
+        } else if (b2Properties.isEnabled()) {
             if (!b2StorageService.exists(apkFile.getFilePath())) {
                 throw new ResourceNotFoundException("Fichier physique non trouvé");
             }
@@ -186,7 +205,9 @@ public class ApkService {
      * @throws IOException : si le fichier ne peut être lu
      */
     public Resource loadApkResource(String storageKey, String originalFileName) throws IOException {
-        if (b2Properties.isEnabled()) {
+        if (s3Properties.isEnabled()) {
+            return s3StorageService.downloadAsResource(storageKey, originalFileName, APK_CONTENT_TYPE);
+        } else if (b2Properties.isEnabled()) {
             return b2StorageService.downloadAsResource(storageKey, originalFileName, APK_CONTENT_TYPE);
         }
         Path path = Paths.get(storageKey);
@@ -302,7 +323,10 @@ public class ApkService {
             String fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
             String uniqueFileName = UUID.randomUUID().toString() + fileExtension;
             String storageKey;
-            if (b2Properties.isEnabled()) {
+            if (s3Properties.isEnabled()) {
+                storageKey = APK_S3_PREFIX + uniqueFileName;
+                s3StorageService.upload(file, storageKey, APK_CONTENT_TYPE);
+            } else if (b2Properties.isEnabled()) {
                 storageKey = APK_OBJECT_PREFIX + uniqueFileName;
                 b2StorageService.upload(file, storageKey, APK_CONTENT_TYPE);
             } else {
@@ -338,7 +362,9 @@ public class ApkService {
      * @param storageKey : clé B2 ou chemin local
      */
     private void deleteStoredFile(String storageKey) {
-        if (b2Properties.isEnabled()) {
+        if (s3Properties.isEnabled()) {
+            s3StorageService.delete(storageKey);
+        } else if (b2Properties.isEnabled()) {
             b2StorageService.delete(storageKey);
         } else {
             Path filePath = Paths.get(storageKey);

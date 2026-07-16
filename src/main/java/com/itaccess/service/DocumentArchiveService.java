@@ -1,11 +1,14 @@
 package com.itaccess.service;
 
 import com.itaccess.config.B2Properties;
+import com.itaccess.config.S3Properties;
 import com.itaccess.dto.DocumentArchiveDTO;
 import com.itaccess.dto.DocumentArchiveRequest;
 import com.itaccess.entity.DocumentArchive;
 import com.itaccess.exception.ResourceNotFoundException;
 import com.itaccess.repository.DocumentArchiveRepository;
+import com.itaccess.service.B2StorageService;
+import com.itaccess.service.S3StorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -34,7 +37,9 @@ public class DocumentArchiveService {
     private final DocumentArchiveRepository documentArchiveRepository;
     private final AuditService auditService;
     private final B2StorageService b2StorageService;
+    private final S3StorageService s3StorageService;
     private final B2Properties b2Properties;
+    private final S3Properties s3Properties;
 
     @Value("${app.upload.document-archive-dir:uploads/documents}")
     private String localDocumentDir;
@@ -233,7 +238,9 @@ public class DocumentArchiveService {
     // -------------------------------------------------------------------------
 
     private String storeFile(MultipartFile file, String uniqueFileName, String contentType) throws IOException {
-        if (b2Properties.isEnabled()) {
+        if (s3Properties.isEnabled()) {
+            return s3StorageService.upload(file, s3StorageService.buildObjectKey(uniqueFileName), contentType);
+        } else if (b2Properties.isEnabled()) {
             return b2StorageService.upload(file, b2StorageService.buildObjectKey(uniqueFileName), contentType);
         }
         Path dir = resolveWritableDocumentDirectory();
@@ -246,14 +253,18 @@ public class DocumentArchiveService {
         if (storageKey == null) {
             return false;
         }
-        if (b2Properties.isEnabled()) {
+        if (s3Properties.isEnabled()) {
+            return s3StorageService.exists(storageKey);
+        } else if (b2Properties.isEnabled()) {
             return b2StorageService.exists(storageKey);
         }
         return Files.exists(Paths.get(storageKey));
     }
 
     private Resource loadDocumentResource(String storageKey, String originalFileName, String contentType) throws IOException {
-        if (b2Properties.isEnabled()) {
+        if (s3Properties.isEnabled()) {
+            return s3StorageService.downloadAsResource(storageKey, originalFileName, contentType);
+        } else if (b2Properties.isEnabled()) {
             return b2StorageService.downloadAsResource(storageKey, originalFileName, contentType);
         }
         Path path = Paths.get(storageKey);
@@ -267,7 +278,9 @@ public class DocumentArchiveService {
         if (storageKey == null) {
             return;
         }
-        if (b2Properties.isEnabled()) {
+        if (s3Properties.isEnabled()) {
+            s3StorageService.delete(storageKey);
+        } else if (b2Properties.isEnabled()) {
             b2StorageService.delete(storageKey);
         } else {
             Path path = Paths.get(storageKey);
